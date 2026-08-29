@@ -19,7 +19,19 @@ Then open http://localhost:8080 in your browser.
 
 ## Refreshing the map data
 
-Re-run the Overpass query for relation `20433499` (Ecoverde Homes) if the OSM data changes, save the result to `data/ecoverde-raw.json`, then rebuild:
+If you edited OSM and want the map to pick it up, re-fetch and rebuild in one step:
+
+```powershell
+node tools/refresh-osm-data.js
+```
+
+This re-queries Overpass for relation `20433499` (Ecoverde Homes) plus the perimeter
+wall/fence bbox, overwrites `data/ecoverde-raw.json` / `data/barriers-raw.json`, and
+rebuilds `data/ecoverde.geojson`. OSM edits can take a few minutes to appear in Overpass,
+so re-run it again if your change isn't showing yet.
+
+Alternatively, re-run the Overpass query manually (e.g. via Overpass Turbo), save the
+result to `data/ecoverde-raw.json`, then rebuild:
 
 ```powershell
 node tools/build-geojson.js

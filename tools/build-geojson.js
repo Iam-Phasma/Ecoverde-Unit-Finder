@@ -43,6 +43,12 @@ function parseBlockLot(tags) {
   return { block: null, lot: null };
 }
 
+/** Parses a "Block 18" / "Block 14A" city_block name into its block key (e.g. "18", "14A"). */
+function parseCityBlockKey(name) {
+  const match = (name || "").match(/Block\s*(\w+)/i);
+  return match ? match[1] : null;
+}
+
 const features = [];
 
 for (const [, el] of ways) {
@@ -57,6 +63,7 @@ for (const [, el] of ways) {
   else if (tags.natural) category = "natural";
   else if (tags.leisure) category = "leisure";
   else if (tags.barrier) category = "barrier";
+  else if (tags.place === "city_block") category = "cityblock";
 
   const closed = isClosed(coords) && category !== "barrier";
   const geometry = closed
@@ -71,6 +78,10 @@ for (const [, el] of ways) {
     props.lot = lot;
     props.searchLabel =
       tags.name || (block && lot ? `B${block} L${lot}` : null);
+  }
+
+  if (category === "cityblock") {
+    props.block = parseCityBlockKey(tags.name);
   }
 
   features.push({ type: "Feature", properties: props, geometry });

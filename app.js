@@ -11,6 +11,7 @@
   const layers = {
     landuse: L.layerGroup().addTo(map),
     leisure: L.layerGroup().addTo(map),
+    cityBlocks: L.layerGroup().addTo(map),
     roadsCasing: L.layerGroup().addTo(map),
     roads: L.layerGroup().addTo(map),
     buildings: L.layerGroup().addTo(map),
@@ -19,7 +20,8 @@
     route: L.layerGroup().addTo(map),
   };
 
-  const buildingLayerById = new Map(); // searchLabel (lowercased) -> leaflet layer
+  const buildingLayerById = new Map(); // "block|lot" (lowercased) -> { layer, props }
+  const cityBlockLayersByKey = new Map(); // block key (e.g. "18", "14A") -> { layers: [...], props }
   let highlighted = null;
   let dataBounds = null;
 
@@ -72,6 +74,11 @@
             lotsByBlock.set(props.block, new Set());
           lotsByBlock.get(props.block).add(props.lot);
         }
+        if (props.category === "cityblock" && props.block) {
+          if (!cityBlockLayersByKey.has(props.block))
+            cityBlockLayersByKey.set(props.block, { layers: [], props });
+          cityBlockLayersByKey.get(props.block).layers.push(layer);
+        }
         if (props.category === "building" || props.category.startsWith("poi")) {
           layer.on("click", () => showInfo(props, layer));
         }
@@ -95,7 +102,7 @@
       group.addLayer(layer);
     });
 
-    populateBlockSelect(lotsByBlock);
+    populateBlockSelect(lotsByBlock, cityBlockLayersByKey);
 
     roadGraph = buildRoadGraph(collection.features);
     mainRoadComponent = largestComponentKeys(roadGraph);
@@ -444,8 +451,10 @@
     return parseInt(a, 10) - parseInt(b, 10) || a.localeCompare(b);
   }
 
-  function populateBlockSelect(lotsByBlock) {
-    const blocks = [...lotsByBlock.keys()].sort(numericCompare);
+  function populateBlockSelect(lotsByBlock, cityBlockLayersByKey) {
+    const blocks = [
+      ...new Set([...lotsByBlock.keys(), ...cityBlockLayersByKey.keys()]),
+    ].sort(numericCompare);
     blockSelect.innerHTML =
       '<option value="">Block</option>' +
       blocks
@@ -479,6 +488,7 @@
     if (category === "road") return "roads";
     if (category === "landuse") return "landuse";
     if (category === "leisure") return "leisure";
+    if (category === "cityblock") return "cityBlocks";
     if (category === "building") return "buildings";
     if (category === "barrier") return "barriers";
     if (category && category.startsWith("poi")) return "pois";
@@ -534,6 +544,13 @@
           weight: 1,
           fillColor: "#d9cdbb",
           fillOpacity: 0.95,
+        };
+      case "cityblock":
+        return {
+          weight: 0,
+          opacity: 0,
+          fill: false,
+          interactive: false,
         };
       default:
         return {
@@ -662,11 +679,12 @@
 
   function clearHighlight() {
     if (highlighted) {
-      highlighted.layer.setStyle(
-        styleForFeature({ properties: highlighted.props }),
-      );
-      const el = highlighted.layer.getElement && highlighted.layer.getElement();
-      if (el) el.classList.remove("building-highlight");
+      const style = styleForFeature({ properties: highlighted.props });
+      for (const layer of highlighted.layers) {
+        layer.setStyle(style);
+        const el = layer.getElement && layer.getElement();
+        if (el) el.classList.remove("building-highlight");
+      }
       highlighted = null;
     }
   }
@@ -683,7 +701,7 @@
     entry.layer.bringToFront();
     const el = entry.layer.getElement && entry.layer.getElement();
     if (el) el.classList.add("building-highlight");
-    highlighted = entry;
+    highlighted = { layers: [entry.layer], props: entry.props };
 
     const bounds = entry.layer.getBounds ? entry.layer.getBounds() : null;
     const destCenter = bounds ? bounds.getCenter() : null;
@@ -698,11 +716,55 @@
     showInfo(entry.props, entry.layer);
   }
 
+  /** Highlights a whole city_block boundary (possibly split across several ways). No route is drawn. */
+  function highlightCityBlock(entry) {
+    clearHighlight();
+    clearRoute();
+    activeDest = null;
+
+    let bounds = null;
+    for (const layer of entry.layers) {
+      layer.setStyle({
+        color: "#ff5a36",
+        weight: 3,
+        opacity: 1,
+        dashArray: null,
+        fill: true,
+        fillColor: "#ff5a36",
+        fillOpacity: 0.12,
+      });
+      layer.bringToFront();
+      const layerBounds = layer.getBounds ? layer.getBounds() : null;
+      if (layerBounds) bounds = bounds ? bounds.extend(layerBounds) : layerBounds;
+    }
+    highlighted = { layers: entry.layers, props: entry.props };
+
+    if (bounds) map.fitBounds(bounds, { maxZoom: 19, padding: [40, 40] });
+    showInfo(entry.props);
+  }
+
   searchForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const block = blockSelect.value;
     const lot = lotSelect.value;
-    if (!block || !lot) return;
+    if (!block) return;
+
+    if (!lot) {
+      const blockEntry = cityBlockLayersByKey.get(block);
+      if (blockEntry) {
+        highlightCityBlock(blockEntry);
+      } else {
+        infoTitle.textContent = "Not found";
+        infoBody.innerHTML = "";
+        const dd = document.createElement("dd");
+        dd.textContent = `No block boundary matching Block ${block}.`;
+        infoBody.appendChild(dd);
+        infoPanel.classList.remove("hidden");
+        infoPanel.classList.add("expanded");
+        infoToggle.setAttribute("aria-expanded", "true");
+      }
+      return;
+    }
 
     const entry = buildingLayerById.get(`${block}|${lot}`.toLowerCase());
 
