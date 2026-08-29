@@ -27,11 +27,21 @@
     <main>
       <div id="map"></div>
       <aside id="info-panel" class="info-panel hidden">
-        <button id="info-close" class="info-close" aria-label="Close">
-          &times;
+        <button
+          id="info-toggle"
+          class="info-toggle"
+          aria-label="Unit info"
+          aria-expanded="false"
+        >
+          i
         </button>
-        <h2 id="info-title">&nbsp;</h2>
-        <dl id="info-body"></dl>
+        <div id="info-content" class="info-content">
+          <button id="info-close" class="info-close" aria-label="Collapse">
+            &times;
+          </button>
+          <h2 id="info-title">&nbsp;</h2>
+          <dl id="info-body"></dl>
+        </div>
       </aside>
     </main>
 

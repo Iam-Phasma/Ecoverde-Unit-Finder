@@ -25,20 +25,28 @@
 
   // road-network graph used to animate a route from the subdivision gate to a house
   const ETA_SPEEDS_KMH = { car: 20, bicycle: 15, walk: 5 };
-  let roadGraph = null;
+  let roadGraph = null; // drivable roads only, footways/paths excluded
   let mainRoadComponent = null;
   let gateNodeKey = null;
   let routeAnimId = null;
+  let activeDest = null; // { destCenter, bounds } for the currently highlighted building
 
   const infoPanel = document.getElementById("info-panel");
+  const infoToggle = document.getElementById("info-toggle");
   const infoTitle = document.getElementById("info-title");
   const infoBody = document.getElementById("info-body");
   const searchForm = document.getElementById("search-form");
   const blockSelect = document.getElementById("block-select");
   const lotSelect = document.getElementById("lot-select");
 
+  infoToggle.addEventListener("click", () => {
+    infoPanel.classList.add("expanded");
+    infoToggle.setAttribute("aria-expanded", "true");
+  });
+
   document.getElementById("info-close").addEventListener("click", () => {
-    infoPanel.classList.add("hidden");
+    infoPanel.classList.remove("expanded");
+    infoToggle.setAttribute("aria-expanded", "false");
   });
 
   fetch("data/ecoverde.geojson")
@@ -100,7 +108,7 @@
     map.fitBounds(dataBounds, { padding: [20, 20] });
   }
 
-  /** Undirected graph of road segments, keyed by rounded "lon,lat" coordinate, for routing. */
+  /** Undirected graph of drivable road segments (footways/paths excluded), keyed by rounded "lon,lat" coordinate, for routing. */
   function buildRoadGraph(features) {
     const graph = { nodes: new Map(), adj: new Map() };
 
@@ -116,6 +124,7 @@
     for (const f of features) {
       if (f.properties.category !== "road" || f.geometry.type !== "LineString")
         continue;
+      if (WALK_HIGHWAYS.has(f.properties.highway)) continue;
       const coords = f.geometry.coordinates;
       for (let i = 0; i < coords.length - 1; i++) {
         const a = ensureNode(coords[i]);
@@ -146,18 +155,62 @@
     return 2 * R * Math.asin(Math.sqrt(h));
   }
 
-  function nearestNodeKey(graph, coord, allowedKeys) {
+  /** Projects coord onto segment a-b (planar approximation, fine at this scale) and returns the closest point plus its distance. */
+  function closestPointOnSegment(coord, a, b) {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const lenSq = dx * dx + dy * dy;
+    let t = lenSq === 0 ? 0 : ((coord[0] - a[0]) * dx + (coord[1] - a[1]) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const point = [a[0] + t * dx, a[1] + t * dy];
+    return { point, dist: haversineMeters(coord, point) };
+  }
+
+  /**
+   * Snaps coord onto the nearest point along any road edge (not just an existing vertex), so a
+   * house doesn't get routed to a far-off intersection just because the fronting road segment
+   * has no vertex near it. Mutates graph with a temporary node; call unsnapPoint to remove it.
+   */
+  function snapPointToGraph(graph, coord, allowedKeys) {
     let best = null;
-    let bestDist = Infinity;
-    for (const [key, nodeCoord] of graph.nodes) {
+    for (const [key, edges] of graph.adj) {
       if (allowedKeys && !allowedKeys.has(key)) continue;
-      const d = haversineMeters(coord, nodeCoord);
-      if (d < bestDist) {
-        bestDist = d;
-        best = key;
+      const a = graph.nodes.get(key);
+      for (const edge of edges) {
+        if (allowedKeys && !allowedKeys.has(edge.to)) continue;
+        const b = graph.nodes.get(edge.to);
+        const { point, dist } = closestPointOnSegment(coord, a, b);
+        if (!best || dist < best.dist) {
+          best = { aKey: key, bKey: edge.to, point, dist };
+        }
       }
     }
-    return best;
+    if (!best) return null;
+
+    const snapKey = `snap:${Math.random().toString(36).slice(2)}`;
+    const distA = haversineMeters(best.point, graph.nodes.get(best.aKey));
+    const distB = haversineMeters(best.point, graph.nodes.get(best.bKey));
+    graph.nodes.set(snapKey, best.point);
+    graph.adj.set(snapKey, [
+      { to: best.aKey, dist: distA },
+      { to: best.bKey, dist: distB },
+    ]);
+    graph.adj.get(best.aKey).push({ to: snapKey, dist: distA });
+    graph.adj.get(best.bKey).push({ to: snapKey, dist: distB });
+    return snapKey;
+  }
+
+  /** Removes a node added by snapPointToGraph, restoring the graph to its original state. */
+  function unsnapPoint(graph, snapKey) {
+    if (!snapKey || !graph.adj.has(snapKey)) return;
+    for (const { to } of graph.adj.get(snapKey)) {
+      const neighborEdges = graph.adj.get(to);
+      if (!neighborEdges) continue;
+      const idx = neighborEdges.findIndex((e) => e.to === snapKey);
+      if (idx !== -1) neighborEdges.splice(idx, 1);
+    }
+    graph.adj.delete(snapKey);
+    graph.nodes.delete(snapKey);
   }
 
   /** Returns the keys of the largest connected component, so routing never snaps to a small, disconnected cluster of road ways. */
@@ -184,7 +237,7 @@
     return best;
   }
 
-  /** Uses the subdivision's mapped entrance park as the "gate", snapped to the nearest routable road node. */
+  /** Uses the subdivision's mapped entrance park as the "gate", snapped onto the nearest point along a routable road. */
   function findGateNodeKey(features, graph, mainComponentKeys) {
     const gateFeature = features.find(
       (f) =>
@@ -199,7 +252,8 @@
     const centroid = ring
       .reduce((acc, c) => [acc[0] + c[0], acc[1] + c[1]], [0, 0])
       .map((v) => v / ring.length);
-    return nearestNodeKey(graph, centroid, mainComponentKeys);
+    // permanent snap: the gate is reused for every route, so it's never unsnapped
+    return snapPointToGraph(graph, centroid, mainComponentKeys);
   }
 
   /** Dijkstra's shortest path; returns { keys, distance } in meters, or null if unreachable. */
@@ -262,14 +316,54 @@
     map.closePopup();
   }
 
+  /** Recomputes and (re)draws the route to the active destination, always using drivable roads. */
+  function showRoute() {
+    if (!activeDest) return;
+    clearRoute();
+
+    const { destCenter, bounds } = activeDest;
+    let route = null;
+    let destSnapKey = null;
+    if (roadGraph && gateNodeKey && destCenter) {
+      destSnapKey = snapPointToGraph(roadGraph, [destCenter.lng, destCenter.lat], mainRoadComponent);
+      if (destSnapKey) route = findRoute(roadGraph, gateNodeKey, destSnapKey);
+    }
+
+    if (route) {
+      const pathLatLngs = route.keys.map((k) => {
+        const [lon, lat] = roadGraph.nodes.get(k);
+        return L.latLng(lat, lon);
+      });
+      unsnapPoint(roadGraph, destSnapKey);
+      const routeBounds = L.latLngBounds(pathLatLngs);
+      if (bounds) routeBounds.extend(bounds);
+      map.fitBounds(routeBounds, { maxZoom: 19, padding: [60, 60] });
+      animateRoute(pathLatLngs, route.distance, destCenter);
+    } else {
+      unsnapPoint(roadGraph, destSnapKey);
+      if (bounds) map.fitBounds(bounds, { maxZoom: 20, padding: [80, 80] });
+    }
+  }
+
   /** Animates a marker along the route, then opens an ETA popup at the house. */
   function animateRoute(pathLatLngs, distanceMeters, destLatLng) {
     L.polyline(pathLatLngs, {
-      color: "#2f7d4f",
-      weight: 3,
-      opacity: 0.85,
-      dashArray: "1,8",
+      className: "route-casing",
+      color: "#1a1a1a",
+      weight: 8,
+      opacity: 0.9,
       lineCap: "round",
+      lineJoin: "round",
+    }).addTo(layers.route);
+
+    L.polyline(pathLatLngs, {
+      className: "route-flow",
+      color: "#e0a800",
+      weight: 5,
+      opacity: 1,
+      dashArray: "14,12",
+      lineCap: "round",
+      lineJoin: "round",
     }).addTo(layers.route);
 
     const cumulative = [0];
@@ -323,6 +417,7 @@
     routeAnimId = requestAnimationFrame(step);
   }
 
+  /** Renders the ETA popup with estimated Car/Bicycle/Walk times for the drawn route. */
   function showEtaPopup(latlng, distanceMeters) {
     const distanceKm = distanceMeters / 1000;
     const rows = [
@@ -561,6 +656,8 @@
     }
 
     infoPanel.classList.remove("hidden");
+    infoPanel.classList.remove("expanded");
+    infoToggle.setAttribute("aria-expanded", "false");
   }
 
   function clearHighlight() {
@@ -590,26 +687,10 @@
 
     const bounds = entry.layer.getBounds ? entry.layer.getBounds() : null;
     const destCenter = bounds ? bounds.getCenter() : null;
+    activeDest = destCenter ? { destCenter, bounds } : null;
 
-    let route = null;
-    if (roadGraph && gateNodeKey && destCenter) {
-      const destKey = nearestNodeKey(
-        roadGraph,
-        [destCenter.lng, destCenter.lat],
-        mainRoadComponent,
-      );
-      route = findRoute(roadGraph, gateNodeKey, destKey);
-    }
-
-    if (route) {
-      const pathLatLngs = route.keys.map((k) => {
-        const [lon, lat] = roadGraph.nodes.get(k);
-        return L.latLng(lat, lon);
-      });
-      const routeBounds = L.latLngBounds(pathLatLngs);
-      if (bounds) routeBounds.extend(bounds);
-      map.fitBounds(routeBounds, { maxZoom: 19, padding: [60, 60] });
-      animateRoute(pathLatLngs, route.distance, destCenter);
+    if (activeDest) {
+      showRoute();
     } else if (bounds) {
       map.fitBounds(bounds, { maxZoom: 20, padding: [80, 80] });
     }
@@ -634,6 +715,8 @@
       dd.textContent = `No unit matching Block ${block}, Lot ${lot}.`;
       infoBody.appendChild(dd);
       infoPanel.classList.remove("hidden");
+      infoPanel.classList.add("expanded");
+      infoToggle.setAttribute("aria-expanded", "true");
     }
   });
 
