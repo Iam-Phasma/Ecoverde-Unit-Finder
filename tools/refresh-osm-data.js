@@ -48,6 +48,25 @@ const barriersQuery = `
 out geom;
 `;
 
+// A small buffer around the subdivision so the nearby national highway and stream show up
+// for geographic context, without pulling in unrelated data far from the entrance.
+const CONTEXT_BUFFER_DEG = 0.006;
+const CONTEXT_BBOX = {
+  minLat: SUBDIVISION_BBOX.minLat - CONTEXT_BUFFER_DEG,
+  minLon: SUBDIVISION_BBOX.minLon - CONTEXT_BUFFER_DEG,
+  maxLat: SUBDIVISION_BBOX.maxLat + CONTEXT_BUFFER_DEG,
+  maxLon: SUBDIVISION_BBOX.maxLon + CONTEXT_BUFFER_DEG,
+};
+
+const contextQuery = `
+[out:json][timeout:60];
+(
+  way[highway~"^(trunk|primary|secondary)$"](${CONTEXT_BBOX.minLat},${CONTEXT_BBOX.minLon},${CONTEXT_BBOX.maxLat},${CONTEXT_BBOX.maxLon});
+  way[waterway~"^(river|stream)$"](${CONTEXT_BBOX.minLat},${CONTEXT_BBOX.minLon},${CONTEXT_BBOX.maxLat},${CONTEXT_BBOX.maxLon});
+);
+out geom;
+`;
+
 async function runQuery(query) {
   const res = await fetch(OVERPASS_URL, {
     method: "POST",
@@ -80,6 +99,14 @@ async function main() {
     JSON.stringify(barriers),
   );
   console.log("Wrote data/barriers-raw.json (", barriers.elements.length, "elements)");
+
+  console.log("Fetching national highway/stream context bbox...");
+  const context = await runQuery(contextQuery);
+  fs.writeFileSync(
+    path.join(__dirname, "..", "data", "context-raw.json"),
+    JSON.stringify(context),
+  );
+  console.log("Wrote data/context-raw.json (", context.elements.length, "elements)");
 
   console.log("Rebuilding data/ecoverde.geojson...");
   execFileSync("node", [path.join(__dirname, "build-geojson.js")], {

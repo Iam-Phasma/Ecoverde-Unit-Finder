@@ -9,6 +9,7 @@ export function groupForCategory(category) {
   if (category === "cityblock") return "cityBlocks";
   if (category === "building") return "buildings";
   if (category === "barrier") return "barriers";
+  if (category && category.startsWith("context-")) return "context";
   if (category && category.startsWith("poi")) return "pois";
   return "buildings";
 }
@@ -129,6 +130,23 @@ export function styleForFeature(feature) {
         weight: 0,
         opacity: 0,
         fill: false,
+        interactive: false,
+      };
+    case "context-road":
+      return {
+        color: "#e8b93b",
+        weight: 4,
+        opacity: 0.55,
+        lineCap: "round",
+        interactive: false,
+      };
+    case "context-water":
+      return {
+        color: "#6fa8c9",
+        weight: 2,
+        opacity: 0.55,
+        dashArray: "1,4",
+        lineCap: "round",
         interactive: false,
       };
     default:

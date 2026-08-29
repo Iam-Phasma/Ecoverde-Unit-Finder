@@ -48,6 +48,7 @@ export function createMapController() {
   recenterControl.addTo(map);
 
   const layers = {
+    context: L.layerGroup().addTo(map),
     landuse: L.layerGroup().addTo(map),
     leisure: L.layerGroup().addTo(map),
     cityBlocks: L.layerGroup().addTo(map),
@@ -120,13 +121,19 @@ export function createMapController() {
       },
     });
 
-    dataBounds = geoJsonLayer.getBounds();
+    dataBounds = null; // computed below, excluding "context-*" features so they don't skew the default fit
 
     geoJsonLayer.eachLayer((layer) => {
-      const group =
-        layers[groupForCategory(layer.feature.properties.category)] ||
-        layers.buildings;
+      const category = layer.feature.properties.category;
+      const group = layers[groupForCategory(category)] || layers.buildings;
       group.addLayer(layer);
+
+      if (!category.startsWith("context-")) {
+        const layerBounds = layer.getBounds
+          ? layer.getBounds()
+          : L.latLngBounds([layer.getLatLng(), layer.getLatLng()]);
+        dataBounds = dataBounds ? dataBounds.extend(layerBounds) : layerBounds;
+      }
     });
 
     populateBlockSelect(lotsByBlock, cityBlockLayersByKey);
@@ -141,6 +148,8 @@ export function createMapController() {
     initGateMarker();
 
     map.fitBounds(dataBounds, { padding: [20, 20] });
+    // pad by 50% so panning can push the subdivision halfway off-screen, but never fully away
+    map.setMaxBounds(dataBounds.pad(0.5));
     updateMinZoom();
     window.addEventListener("resize", updateMinZoom);
   }
@@ -458,7 +467,25 @@ export function createMapController() {
     }
     highlighted = { layers: entry.layers, props: entry.props };
 
-    if (bounds) map.fitBounds(bounds, { maxZoom: 19, padding: [40, 40] });
+    if (bounds) {
+      map.fitBounds(bounds, { maxZoom: 19, padding: [40, 40] });
+      showBlockClearButton(bounds);
+    }
+  }
+
+  /** Places a small × button at the top of the highlighted block boundary to clear the selection. */
+  function showBlockClearButton(bounds) {
+    const topCenter = L.latLng(bounds.getNorth(), bounds.getCenter().lng);
+    L.marker(topCenter, {
+      icon: L.divIcon({
+        className: "block-clear-marker",
+        html: '<div class="block-clear-handle">&times;</div>',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+      }),
+    })
+      .addTo(layers.route)
+      .on("click", () => clearSelection());
   }
 
   return {
@@ -470,5 +497,6 @@ export function createMapController() {
     loadData,
     highlightBuilding,
     highlightCityBlock,
+    clearSelection,
   };
 }

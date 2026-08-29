@@ -26,37 +26,18 @@ body {
   background: var(--bg);
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 1.25rem;
-  background: var(--panel-bg);
-  border-bottom: 2px solid var(--building-line);
-  flex-wrap: wrap;
-}
-
-.topbar h1 {
-  font-size: 1.15rem;
-  margin: 0;
-  white-space: nowrap;
-}
-
-.topbar h1 span {
-  font-weight: 400;
-  color: var(--accent);
-}
-
 .search {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
   display: flex;
   gap: 0.5rem;
   align-items: center;
 }
 
 .search select {
-  width: auto;
-  max-width: 130px;
+  width: 100px;
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--building-line);
   border-radius: 4px;
@@ -144,25 +125,13 @@ body {
 
 main {
   position: relative;
-  height: calc(100% - 108px);
+  height: 100%;
 }
 
 #map {
   position: absolute;
   inset: 0;
   background: var(--bg);
-}
-
-.attribution {
-  padding: 0.35rem 1rem;
-  font-size: 0.75rem;
-  background: var(--panel-bg);
-  border-top: 1px solid var(--building-line);
-  text-align: right;
-}
-
-.attribution a {
-  color: var(--accent);
 }
 
 /* Leaflet element flat-styling */
@@ -220,6 +189,22 @@ main {
 
 .gate-marker-handle:active {
   cursor: grabbing;
+}
+
+.block-clear-handle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #a3402e;
+  border: 2px solid #fff;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 .recenter-control a {

@@ -5,12 +5,18 @@ const path = require("path");
 
 const RAW_PATH = path.join(__dirname, "..", "data", "ecoverde-raw.json");
 const BARRIERS_PATH = path.join(__dirname, "..", "data", "barriers-raw.json");
+const CONTEXT_PATH = path.join(__dirname, "..", "data", "context-raw.json");
 const OUT_PATH = path.join(__dirname, "..", "data", "ecoverde.geojson");
 
 const raw = JSON.parse(fs.readFileSync(RAW_PATH, "utf8"));
 // fetched separately via bbox: the area(...) query misses the perimeter wall
 // because it sits exactly on the neighbourhood boundary edge.
 const barriersRaw = JSON.parse(fs.readFileSync(BARRIERS_PATH, "utf8"));
+// optional: the national highway and stream just outside the subdivision, shown
+// faintly for geographic context (see tools/refresh-osm-data.js).
+const contextRaw = fs.existsSync(CONTEXT_PATH)
+  ? JSON.parse(fs.readFileSync(CONTEXT_PATH, "utf8"))
+  : { elements: [] };
 
 const nodes = new Map(); // id -> [lon, lat]
 const ways = new Map(); // id -> element
@@ -134,6 +140,25 @@ for (const el of barriersRaw.elements) {
   features.push({
     type: "Feature",
     properties: { category: "barrier", ...el.tags },
+    geometry: { type: "LineString", coordinates: coords },
+  });
+}
+
+// National highway and stream just outside the subdivision wall, kept separate from the
+// main road/barrier categories so the frontend can render them as faint background context.
+for (const el of contextRaw.elements) {
+  if (el.type !== "way" || !el.tags || !el.geometry) continue;
+  const coords = el.geometry.map((p) => [p.lon, p.lat]);
+  if (coords.length < 2) continue;
+
+  let category = null;
+  if (el.tags.highway) category = "context-road";
+  else if (el.tags.waterway) category = "context-water";
+  if (!category) continue;
+
+  features.push({
+    type: "Feature",
+    properties: { category, ...el.tags },
     geometry: { type: "LineString", coordinates: coords },
   });
 }

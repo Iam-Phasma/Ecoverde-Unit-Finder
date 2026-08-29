@@ -34,7 +34,10 @@ searchForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const block = controller.blockSelect.value;
   const lot = controller.lotSelect.value;
-  if (!block) return;
+  if (!block) {
+    controller.clearSelection();
+    return;
+  }
 
   if (!lot) {
     const blockEntry = controller.cityBlockLayersByKey.get(block);
