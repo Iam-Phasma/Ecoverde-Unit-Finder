@@ -51,6 +51,7 @@ export function createMapController() {
     context: L.layerGroup().addTo(map),
     landuse: L.layerGroup().addTo(map),
     leisure: L.layerGroup().addTo(map),
+    leisureDots: L.layerGroup().addTo(map),
     cityBlocks: L.layerGroup().addTo(map),
     roadsCasing: L.layerGroup().addTo(map),
     roads: L.layerGroup().addTo(map),
@@ -87,6 +88,7 @@ export function createMapController() {
   }
 
   function renderData(collection) {
+    layers.leisureDots.clearLayers();
     const lotsByBlock = new Map(); // block -> Set(lot)
 
     const geoJsonLayer = L.geoJSON(collection, {
@@ -127,6 +129,7 @@ export function createMapController() {
       const category = layer.feature.properties.category;
       const group = layers[groupForCategory(category)] || layers.buildings;
       group.addLayer(layer);
+      if (category === "leisure") addLeisureTextureDots(layer);
 
       if (!category.startsWith("context-")) {
         const layerBounds = layer.getBounds
@@ -152,6 +155,85 @@ export function createMapController() {
     map.setMaxBounds(dataBounds.pad(0.5));
     updateMinZoom();
     window.addEventListener("resize", updateMinZoom);
+  }
+
+  function addLeisureTextureDots(layer) {
+    const ring = getOuterRingLatLngs(layer);
+    if (!ring || ring.length < 3) return;
+
+    const lats = ring.map((p) => p.lat);
+    const lons = ring.map((p) => p.lng);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLon = Math.min(...lons);
+    const maxLon = Math.max(...lons);
+
+    const spacingMeters = 8;
+    const meanLat = (minLat + maxLat) / 2;
+    const metersPerDegLat = 111320;
+    const metersPerDegLon = Math.max(
+      1,
+      Math.abs(Math.cos((meanLat * Math.PI) / 180) * 111320),
+    );
+    const dLat = spacingMeters / metersPerDegLat;
+    const dLon = spacingMeters / metersPerDegLon;
+
+    const polygon = ring.map((p) => [p.lat, p.lng]);
+    let count = 0;
+    const maxDots = 800;
+
+    for (let lat = minLat + dLat * 0.5; lat <= maxLat; lat += dLat) {
+      for (let lon = minLon + dLon * 0.5; lon <= maxLon; lon += dLon) {
+        if (count >= maxDots) break;
+        if (!pointInPolygon([lat, lon], polygon)) continue;
+        layers.leisureDots.addLayer(
+          L.circleMarker([lat, lon], {
+            radius: 1.1,
+            color: "#9ec58f",
+            weight: 0,
+            fillColor: "#8fbc80",
+            fillOpacity: 0.75,
+            interactive: false,
+          }),
+        );
+        count++;
+      }
+      if (count >= maxDots) break;
+    }
+  }
+
+  function getOuterRingLatLngs(layer) {
+    if (!layer.getLatLngs) return null;
+    const ll = layer.getLatLngs();
+    if (!Array.isArray(ll) || ll.length === 0) return null;
+
+    let ring = null;
+    if (ll[0] && typeof ll[0].lat === "number") {
+      ring = ll;
+    } else if (Array.isArray(ll[0])) {
+      if (ll[0].length > 0 && Array.isArray(ll[0][0])) {
+        ring = ll[0][0];
+      } else {
+        ring = ll[0];
+      }
+    }
+    return ring || null;
+  }
+
+  function pointInPolygon(point, polygon) {
+    const x = point[1];
+    const y = point[0];
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i][1];
+      const yi = polygon[i][0];
+      const xj = polygon[j][1];
+      const yj = polygon[j][0];
+      const intersects =
+        yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+      if (intersects) inside = !inside;
+    }
+    return inside;
   }
 
   /** Locks zooming out past the point where the whole subdivision already fits on screen. */

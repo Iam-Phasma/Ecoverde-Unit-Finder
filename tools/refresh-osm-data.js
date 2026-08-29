@@ -34,6 +34,7 @@ area(${3600000000 + RELATION_ID})->.searchArea;
   node(area.searchArea)[shop];
   node(area.searchArea)[amenity];
   node(area.searchArea)[office];
+  node(area.searchArea)[natural=tree];
 );
 out body;
 >;

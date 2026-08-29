@@ -149,6 +149,25 @@ export function styleForFeature(feature) {
         lineCap: "round",
         interactive: false,
       };
+    case "poi-tree":
+      return {
+        color: "#6fad66",
+        weight: 1.2,
+        opacity: 0.95,
+        fillColor: "#87c97d",
+        fillOpacity: 0.68,
+      };
+    case "poi-shop":
+    case "poi-amenity":
+    case "poi-office":
+    case "poi-leisure":
+      return {
+        color: "transparent",
+        weight: 0,
+        opacity: 0,
+        fillColor: "transparent",
+        fillOpacity: 0,
+      };
     default:
       return {
         color: "#c3b49c",
@@ -165,8 +184,33 @@ export function pointToLayer(feature, latlng) {
     "poi-amenity": "#2f7d4f",
     "poi-office": "#3a5fcd",
     "poi-leisure": "#2f7d4f",
+    "poi-tree": "#7fbf7f",
   };
   const color = colors[feature.properties.category] || "#555";
+  // Keep only actual OSM tree points visible. Hide other POI point markers.
+  if (feature.properties && feature.properties.category === "poi-tree") {
+    return L.circleMarker(latlng, {
+      radius: 8,
+      color: "#6fad66",
+      weight: 1.2,
+      opacity: 0.95,
+      fillColor: "#87c97d",
+      fillOpacity: 0.68,
+      interactive: false,
+    });
+  }
+
+  if (feature.properties && typeof feature.properties.category === "string" && feature.properties.category.startsWith("poi-")) {
+    return L.circleMarker(latlng, {
+      radius: 0.1,
+      color: "transparent",
+      weight: 0,
+      fillOpacity: 0,
+      opacity: 0,
+      interactive: false,
+    });
+  }
+
   return L.circleMarker(latlng, {
     radius: 6,
     color: "#fff",

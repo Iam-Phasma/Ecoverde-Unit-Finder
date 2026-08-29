@@ -102,6 +102,8 @@ for (const el of raw.elements) {
       ? "poi-amenity"
       : tags.office
         ? "poi-office"
+        : tags.natural === "tree"
+          ? "poi-tree"
         : tags.leisure
           ? "poi-leisure"
           : null;
