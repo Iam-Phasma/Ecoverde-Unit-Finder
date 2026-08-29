@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ecoverde Homes &mdash; Unit Finder</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Ecoverde Homes <span>Unit Finder</span></h1>
+      <form id="search-form" class="search" autocomplete="off">
+        <select id="block-select" aria-label="Block">
+          <option value="">Block</option>
+        </select>
+        <select id="lot-select" aria-label="Lot" disabled>
+          <option value="">Lot</option>
+        </select>
+        <button type="submit">Find</button>
+      </form>
+    </header>
+
+    <main>
+      <div id="map"></div>
+      <aside id="info-panel" class="info-panel hidden">
+        <button id="info-close" class="info-close" aria-label="Close">
+          &times;
+        </button>
+        <h2 id="info-title">&nbsp;</h2>
+        <dl id="info-body"></dl>
+      </aside>
+    </main>
+
+    <footer class="attribution">
+      Map data &copy;
+      <a
+        href="https://www.openstreetmap.org/copyright"
+        target="_blank"
+        rel="noopener"
+        >OpenStreetMap contributors</a
+      >
+      (ODbL)
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
