@@ -18,6 +18,7 @@
     barriers: L.layerGroup().addTo(map),
     pois: L.layerGroup().addTo(map),
     route: L.layerGroup().addTo(map),
+    gate: L.layerGroup().addTo(map),
   };
 
   const buildingLayerById = new Map(); // "block|lot" (lowercased) -> { layer, props }
@@ -30,26 +31,38 @@
   let roadGraph = null; // drivable roads only, footways/paths excluded
   let mainRoadComponent = null;
   let gateNodeKey = null;
+  let gateMarker = null; // draggable marker letting the user relocate the route's starting point
+  let gateMoved = false; // true once the user drags the gate marker away from its default position
   let routeAnimId = null;
   let activeDest = null; // { destCenter, bounds } for the currently highlighted building
 
-  const infoPanel = document.getElementById("info-panel");
-  const infoToggle = document.getElementById("info-toggle");
-  const infoTitle = document.getElementById("info-title");
-  const infoBody = document.getElementById("info-body");
   const searchForm = document.getElementById("search-form");
   const blockSelect = document.getElementById("block-select");
   const lotSelect = document.getElementById("lot-select");
+  const layersToggle = document.getElementById("layers-toggle");
+  const layersPanel = document.getElementById("layers-panel");
+  const layerObstacle = document.getElementById("layer-obstacle");
+  const layerLeisure = document.getElementById("layer-leisure");
+  const layerAdministrative = document.getElementById("layer-administrative");
 
-  infoToggle.addEventListener("click", () => {
-    infoPanel.classList.add("expanded");
-    infoToggle.setAttribute("aria-expanded", "true");
+  layersToggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const expanded = layersPanel.classList.toggle("hidden") === false;
+    layersToggle.setAttribute("aria-expanded", String(expanded));
   });
 
-  document.getElementById("info-close").addEventListener("click", () => {
-    infoPanel.classList.remove("expanded");
-    infoToggle.setAttribute("aria-expanded", "false");
+  document.addEventListener("click", (e) => {
+    if (!layersPanel.classList.contains("hidden") && !layersPanel.contains(e.target)) {
+      layersPanel.classList.add("hidden");
+      layersToggle.setAttribute("aria-expanded", "false");
+    }
   });
+
+  // None of these are wired to existing layers yet — Obstacle/Leisure/Administrative
+  // refer to data that hasn't been fetched, not the current barriers/leisure layers.
+  layerObstacle.addEventListener("change", () => {});
+  layerLeisure.addEventListener("change", () => {});
+  layerAdministrative.addEventListener("change", () => {});
 
   fetch("data/ecoverde.geojson")
     .then((res) => res.json())
@@ -78,9 +91,6 @@
           if (!cityBlockLayersByKey.has(props.block))
             cityBlockLayersByKey.set(props.block, { layers: [], props });
           cityBlockLayersByKey.get(props.block).layers.push(layer);
-        }
-        if (props.category === "building" || props.category.startsWith("poi")) {
-          layer.on("click", () => showInfo(props, layer));
         }
         if (props.category === "road") {
           const casingStyle = roadCasingStyle(props);
@@ -111,8 +121,19 @@
       roadGraph,
       mainRoadComponent,
     );
+    initGateMarker();
 
     map.fitBounds(dataBounds, { padding: [20, 20] });
+    updateMinZoom();
+    window.addEventListener("resize", updateMinZoom);
+  }
+
+  /** Locks zooming out past the point where the whole subdivision already fits on screen. */
+  function updateMinZoom() {
+    if (!dataBounds) return;
+    const fitZoom = map.getBoundsZoom(dataBounds, false, [20, 20]);
+    map.setMinZoom(fitZoom);
+    if (map.getZoom() < fitZoom) map.setZoom(fitZoom);
   }
 
   /** Undirected graph of drivable road segments (footways/paths excluded), keyed by rounded "lon,lat" coordinate, for routing. */
@@ -323,6 +344,40 @@
     map.closePopup();
   }
 
+  /** Creates the draggable marker for the route's starting point (the subdivision gate). */
+  function initGateMarker() {
+    if (!roadGraph || !gateNodeKey) return;
+    const [lon, lat] = roadGraph.nodes.get(gateNodeKey);
+    gateMarker = L.marker([lat, lon], {
+      icon: L.divIcon({
+        className: "gate-marker",
+        html: '<div class="gate-marker-handle">✥</div>',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+      }),
+      draggable: true,
+      autoPan: true,
+      title: "Drag to move the starting point",
+    }).addTo(layers.gate);
+
+    gateMarker.on("dragend", () => relocateGate(gateMarker.getLatLng()));
+  }
+
+  /** Re-snaps the gate to the nearest drivable road point and redraws the active route from there. */
+  function relocateGate(latlng) {
+    if (!roadGraph) return;
+    const newKey = snapPointToGraph(roadGraph, [latlng.lng, latlng.lat], mainRoadComponent);
+    if (!newKey) return;
+    if (gateNodeKey) unsnapPoint(roadGraph, gateNodeKey);
+    gateNodeKey = newKey;
+    gateMoved = true;
+
+    const [lon, lat] = roadGraph.nodes.get(gateNodeKey);
+    gateMarker.setLatLng([lat, lon]);
+
+    if (activeDest) showRoute();
+  }
+
   /** Recomputes and (re)draws the route to the active destination, always using drivable roads. */
   function showRoute() {
     if (!activeDest) return;
@@ -396,6 +451,7 @@
       Math.max(1200, (total / VISUAL_SPEED_MPS) * 1000),
     );
     const start = performance.now();
+    showEtaPopup(destLatLng, total);
 
     function step(now) {
       const t = Math.min((now - start) / duration, 1);
@@ -418,7 +474,6 @@
         routeAnimId = requestAnimationFrame(step);
       } else {
         routeAnimId = null;
-        showEtaPopup(destLatLng, total);
       }
     }
     routeAnimId = requestAnimationFrame(step);
@@ -439,10 +494,14 @@
       })
       .join("");
 
-    L.popup({ className: "eta-popup", closeButton: true, offset: [0, -6] })
+    L.popup({
+      className: "eta-popup",
+      closeButton: true,
+      offset: [0, -28],
+    })
       .setLatLng(latlng)
       .setContent(
-        `<div class="eta-title">ETA from the gate &middot; ${distanceKm.toFixed(2)} km</div>${rows}`,
+        `<div class="eta-title">ETA from the ${gateMoved ? "start point" : "gate"} &middot; ${distanceKm.toFixed(2)} km</div>${rows}`,
       )
       .openOn(map);
   }
@@ -648,35 +707,6 @@
     });
   }
 
-  function showInfo(props, layer) {
-    infoTitle.textContent = props.searchLabel || props.name || "Unit";
-    infoBody.innerHTML = "";
-
-    const rows = [];
-    if (props.block) rows.push(["Block", props.block]);
-    if (props.lot) rows.push(["Lot", props.lot]);
-    if (props["house"]) rows.push(["Type", props["house"]]);
-    if (props["addr:city"]) rows.push(["City", props["addr:city"]]);
-    if (props["addr:province"]) rows.push(["Province", props["addr:province"]]);
-    if (props["addr:postcode"]) rows.push(["Postcode", props["addr:postcode"]]);
-    if (props.shop) rows.push(["Shop", props.shop]);
-    if (props.amenity) rows.push(["Amenity", props.amenity]);
-    if (props.office) rows.push(["Office", props.office]);
-
-    for (const [label, value] of rows) {
-      const dt = document.createElement("dt");
-      dt.textContent = label;
-      const dd = document.createElement("dd");
-      dd.textContent = value;
-      infoBody.appendChild(dt);
-      infoBody.appendChild(dd);
-    }
-
-    infoPanel.classList.remove("hidden");
-    infoPanel.classList.remove("expanded");
-    infoToggle.setAttribute("aria-expanded", "false");
-  }
-
   function clearHighlight() {
     if (highlighted) {
       const style = styleForFeature({ properties: highlighted.props });
@@ -712,8 +742,6 @@
     } else if (bounds) {
       map.fitBounds(bounds, { maxZoom: 20, padding: [80, 80] });
     }
-
-    showInfo(entry.props, entry.layer);
   }
 
   /** Highlights a whole city_block boundary (possibly split across several ways). No route is drawn. */
@@ -740,7 +768,6 @@
     highlighted = { layers: entry.layers, props: entry.props };
 
     if (bounds) map.fitBounds(bounds, { maxZoom: 19, padding: [40, 40] });
-    showInfo(entry.props);
   }
 
   searchForm.addEventListener("submit", (e) => {
@@ -754,14 +781,7 @@
       if (blockEntry) {
         highlightCityBlock(blockEntry);
       } else {
-        infoTitle.textContent = "Not found";
-        infoBody.innerHTML = "";
-        const dd = document.createElement("dd");
-        dd.textContent = `No block boundary matching Block ${block}.`;
-        infoBody.appendChild(dd);
-        infoPanel.classList.remove("hidden");
-        infoPanel.classList.add("expanded");
-        infoToggle.setAttribute("aria-expanded", "true");
+        console.warn(`No block boundary matching Block ${block}.`);
       }
       return;
     }
@@ -771,14 +791,7 @@
     if (entry) {
       highlightBuilding(entry);
     } else {
-      infoTitle.textContent = "Not found";
-      infoBody.innerHTML = "";
-      const dd = document.createElement("dd");
-      dd.textContent = `No unit matching Block ${block}, Lot ${lot}.`;
-      infoBody.appendChild(dd);
-      infoPanel.classList.remove("hidden");
-      infoPanel.classList.add("expanded");
-      infoToggle.setAttribute("aria-expanded", "true");
+      console.warn(`No unit matching Block ${block}, Lot ${lot}.`);
     }
   });
 

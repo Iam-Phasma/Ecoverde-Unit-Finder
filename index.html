@@ -21,28 +21,36 @@
           <option value="">Lot</option>
         </select>
         <button type="submit">Find</button>
+        <span class="search-separator" aria-hidden="true"></span>
+        <div class="layers-menu">
+          <button
+            type="button"
+            id="layers-toggle"
+            aria-haspopup="true"
+            aria-expanded="false"
+          >
+            Layers
+          </button>
+          <div id="layers-panel" class="layers-panel hidden">
+            <label>
+              <input type="checkbox" id="layer-obstacle" checked />
+              Obstacle
+            </label>
+            <label>
+              <input type="checkbox" id="layer-leisure" checked />
+              Leisure
+            </label>
+            <label>
+              <input type="checkbox" id="layer-administrative" checked />
+              Administrative
+            </label>
+          </div>
+        </div>
       </form>
     </header>
 
     <main>
       <div id="map"></div>
-      <aside id="info-panel" class="info-panel hidden">
-        <button
-          id="info-toggle"
-          class="info-toggle"
-          aria-label="Unit info"
-          aria-expanded="false"
-        >
-          i
-        </button>
-        <div id="info-content" class="info-content">
-          <button id="info-close" class="info-close" aria-label="Collapse">
-            &times;
-          </button>
-          <h2 id="info-title">&nbsp;</h2>
-          <dl id="info-body"></dl>
-        </div>
-      </aside>
     </main>
 
     <footer class="attribution">
