@@ -8,6 +8,27 @@
     maxZoom: 22,
   });
 
+  const recenterControl = L.control({ position: "topleft" });
+  recenterControl.onAdd = function () {
+    const container = L.DomUtil.create(
+      "div",
+      "leaflet-bar leaflet-control recenter-control",
+    );
+    const link = L.DomUtil.create("a", "", container);
+    link.href = "#";
+    link.title = "Center map";
+    link.setAttribute("role", "button");
+    link.setAttribute("aria-label", "Center map");
+    link.innerHTML = "⊙";
+    L.DomEvent.disableClickPropagation(container);
+    L.DomEvent.on(link, "click", (e) => {
+      L.DomEvent.preventDefault(e);
+      recenterMap();
+    });
+    return container;
+  };
+  recenterControl.addTo(map);
+
   const layers = {
     landuse: L.layerGroup().addTo(map),
     leisure: L.layerGroup().addTo(map),
@@ -35,6 +56,7 @@
   let gateMoved = false; // true once the user drags the gate marker away from its default position
   let routeAnimId = null;
   let activeDest = null; // { destCenter, bounds } for the currently highlighted building
+  let lastEtaInfo = null; // { latlng, distanceMeters } for reopening the popup on click
 
   const searchForm = document.getElementById("search-form");
   const blockSelect = document.getElementById("block-select");
@@ -86,6 +108,7 @@
           if (!lotsByBlock.has(props.block))
             lotsByBlock.set(props.block, new Set());
           lotsByBlock.get(props.block).add(props.lot);
+          layer.on("click", () => reopenEtaPopupFor(layer));
         }
         if (props.category === "cityblock" && props.block) {
           if (!cityBlockLayersByKey.has(props.block))
@@ -134,6 +157,22 @@
     const fitZoom = map.getBoundsZoom(dataBounds, false, [20, 20]);
     map.setMinZoom(fitZoom);
     if (map.getZoom() < fitZoom) map.setZoom(fitZoom);
+  }
+
+  /** Centers on the whole subdivision, or on the active route's start/end if one is drawn. */
+  function recenterMap() {
+    if (lastEtaInfo && activeDest && gateMarker) {
+      const bounds = L.latLngBounds([gateMarker.getLatLng(), lastEtaInfo.latlng]);
+      if (activeDest.bounds) bounds.extend(activeDest.bounds);
+      // extra top padding reserves room for the ETA popup, which sits above the destination
+      map.fitBounds(bounds, {
+        maxZoom: 19,
+        paddingTopLeft: [60, 180],
+        paddingBottomRight: [60, 60],
+      });
+    } else if (dataBounds) {
+      map.fitBounds(dataBounds, { padding: [20, 20] });
+    }
   }
 
   /** Undirected graph of drivable road segments (footways/paths excluded), keyed by rounded "lon,lat" coordinate, for routing. */
@@ -342,6 +381,7 @@
     }
     layers.route.clearLayers();
     map.closePopup();
+    lastEtaInfo = null;
   }
 
   /** Creates the draggable marker for the route's starting point (the subdivision gate). */
@@ -481,6 +521,7 @@
 
   /** Renders the ETA popup with estimated Car/Bicycle/Walk times for the drawn route. */
   function showEtaPopup(latlng, distanceMeters) {
+    lastEtaInfo = { latlng, distanceMeters };
     const distanceKm = distanceMeters / 1000;
     const rows = [
       ["🚗", "Car", ETA_SPEEDS_KMH.car],
@@ -494,16 +535,33 @@
       })
       .join("");
 
-    L.popup({
+    const popup = L.popup({
       className: "eta-popup",
-      closeButton: true,
+      closeButton: false,
       offset: [0, -28],
     })
       .setLatLng(latlng)
       .setContent(
-        `<div class="eta-title">ETA from the ${gateMoved ? "start point" : "gate"} &middot; ${distanceKm.toFixed(2)} km</div>${rows}`,
+        `<div class="eta-title">ETA from the ${gateMoved ? "start point" : "gate"} &middot; ${distanceKm.toFixed(2)} km</div>${rows}` +
+        `<div class="eta-actions">` +
+          `<button type="button" class="eta-clear" aria-label="Clear route">Clear route</button>` +
+          `<button type="button" class="eta-dismiss" aria-label="Dismiss">Dismiss</button>` +
+        `</div>`,
       )
       .openOn(map);
+
+    const popupEl = popup.getElement();
+    if (popupEl) {
+      popupEl.querySelector(".eta-dismiss")?.addEventListener("click", () => map.closePopup());
+      popupEl.querySelector(".eta-clear")?.addEventListener("click", () => clearSelection());
+    }
+  }
+
+  /** Fully clears the current selection: highlight, route, and destination state. */
+  function clearSelection() {
+    clearHighlight();
+    clearRoute();
+    activeDest = null;
   }
 
   function numericCompare(a, b) {
@@ -717,6 +775,12 @@
       }
       highlighted = null;
     }
+  }
+
+  /** Reopens the ETA popup when the currently highlighted unit is clicked again after closing it. */
+  function reopenEtaPopupFor(layer) {
+    if (!highlighted || !highlighted.layers.includes(layer) || !lastEtaInfo) return;
+    showEtaPopup(lastEtaInfo.latlng, lastEtaInfo.distanceMeters);
   }
 
   function highlightBuilding(entry) {

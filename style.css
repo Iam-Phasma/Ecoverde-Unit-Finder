@@ -199,6 +199,7 @@ main {
   text-align: center;
   transform: translate(-2px, -2px);
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
 }
 
 .gate-marker-handle {
@@ -221,29 +222,84 @@ main {
   cursor: grabbing;
 }
 
+.recenter-control a {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
 .eta-popup .leaflet-popup-content-wrapper {
   background: var(--panel-bg);
   border: 2px solid var(--building-line);
   border-radius: 10px;
 }
 
+.eta-popup .leaflet-popup-content {
+  margin: 0.9rem 1.1rem;
+  min-width: 210px;
+}
+
 .eta-popup .leaflet-popup-tip-container {
   display: none;
 }
 
-.eta-title {
+.eta-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--building-line);
+}
+
+.eta-actions button {
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.8rem;
   font-weight: 600;
+  cursor: pointer;
+}
+
+.eta-clear {
+  background: #a3402e;
+  color: #fff;
+}
+
+.eta-clear:hover {
+  background: #86321f;
+}
+
+.eta-dismiss {
+  background: #e9e2d3;
+  color: var(--ink);
+}
+
+.eta-dismiss:hover {
+  background: #ddd3bd;
+}
+
+.eta-title {
+  font-weight: 700;
   color: var(--accent);
-  margin-bottom: 0.4rem;
-  font-size: 0.9rem;
+  margin: 0 0 0.55rem 0;
+  padding-bottom: 0.5rem;
+  font-size: 0.92rem;
+  border-bottom: 1px solid var(--building-line);
 }
 
 .eta-row {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 1.5rem;
   font-size: 0.9rem;
-  padding: 0.15rem 0;
+  padding: 0.28rem 0;
+}
+
+.eta-row strong {
+  color: var(--ink);
 }
 
 @keyframes pulse {
