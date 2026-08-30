@@ -1044,7 +1044,13 @@ export function createMapController() {
         hideRoutePanel();
       }
       unsnapPoint(roadGraph, destSnapKey);
-      if (bounds) map.fitBounds(bounds, { maxZoom: 20, padding: [80, 80] });
+      if (fromReroute && gateMarker && destCenter) {
+        const blockedBounds = L.latLngBounds([gateMarker.getLatLng(), destCenter]);
+        if (bounds) blockedBounds.extend(bounds);
+        map.fitBounds(blockedBounds, { maxZoom: 19, padding: [60, 60] });
+      } else if (bounds) {
+        map.fitBounds(bounds, { maxZoom: 20, padding: [80, 80] });
+      }
     }
     updateRerouteButtonState();
   }
