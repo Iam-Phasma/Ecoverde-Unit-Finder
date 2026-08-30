@@ -170,12 +170,18 @@ main {
   border-radius: 50%;
   background: #ffffff;
   border: 2px solid #6a5d4b;
+  color: #4f3528;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.95rem;
   line-height: 1;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.admin-pin-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 
 .obstacle-pin {
@@ -189,12 +195,30 @@ main {
   border-radius: 50%;
   background: #ffffff;
   border: 2px solid #8b4a39;
+  color: #8b4a39;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.95rem;
   line-height: 1;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92), 0 3px 9px rgba(0, 0, 0, 0.25);
+}
+
+.obstacle-pin-badge--no-exit {
+  border-color: #8e1f2f;
+  color: #8e1f2f;
+  background: #fbecee;
+}
+
+.obstacle-pin-badge--speed-bump {
+  border-color: #8a6a00;
+  color: #8a6a00;
+  background: #fff6da;
+}
+
+.obstacle-pin-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 
 .road-name-text {
@@ -274,6 +298,50 @@ main {
 .recenter-control a {
   font-size: 1.1rem;
   font-weight: 700;
+}
+
+.compass-toggle-control {
+  display: none;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.leaflet-bar.compass-toggle-control {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.compass-toggle-control a {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px !important;
+  border: 2px solid #bfb3a0;
+  background: #ffffff;
+  color: #2c2825;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  overflow: hidden;
+}
+
+.leaflet-bar.compass-toggle-control a {
+  border-bottom: 0;
+}
+
+.compass-glyph-svg {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.compass-toggle-control a.is-active {
+  background: #2f7d4f;
+  color: #fff;
 }
 
 .route-panel {
@@ -481,6 +549,10 @@ main {
 
   .recenter-control {
     display: none;
+  }
+
+  .compass-toggle-control {
+    display: block;
   }
 
   .route-actions {

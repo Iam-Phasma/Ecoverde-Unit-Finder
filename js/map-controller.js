@@ -29,6 +29,20 @@ export function createMapController() {
     maxZoom: 22,
   });
 
+  const isMobileViewport = window.matchMedia("(max-width: 720px)");
+  const rotatablePanes = [
+    "tilePane",
+    "overlayPane",
+    "shadowPane",
+    "markerPane",
+    "tooltipPane",
+    "popupPane",
+  ];
+  let compassEnabled = false;
+  let orientationListening = false;
+  let currentRotationDeg = 0;
+  let compassButton = null;
+
   const navControl = L.control({ position: "bottomright" });
   navControl.onAdd = function () {
     const container = L.DomUtil.create(
@@ -73,6 +87,32 @@ export function createMapController() {
     return container;
   };
   navControl.addTo(map);
+
+  const compassControl = L.control({ position: "bottomright" });
+  compassControl.onAdd = function () {
+    const container = L.DomUtil.create(
+      "div",
+      "leaflet-bar leaflet-control compass-toggle-control",
+    );
+    const button = L.DomUtil.create("a", "", container);
+    button.href = "#";
+    button.title = "Auto-rotate by compass";
+    button.setAttribute("role", "button");
+    button.setAttribute("aria-label", "Auto-rotate by compass");
+    button.setAttribute("aria-pressed", "false");
+    button.innerHTML =
+      '<svg class="compass-glyph-svg" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2a1 1 0 0 1 .932.638l7 18a1 1 0 0 1-1.326 1.281L13 19.517V13a1 1 0 1 0-2 0v6.517l-5.606 2.402a1 1 0 0 1-1.326-1.281l7-18A1 1 0 0 1 12 2Z" clip-rule="evenodd"/></svg>';
+    compassButton = button;
+
+    L.DomEvent.disableClickPropagation(container);
+    L.DomEvent.on(button, "click", async (e) => {
+      L.DomEvent.preventDefault(e);
+      await toggleCompassRotation();
+    });
+    updateCompassControlVisibility();
+    return container;
+  };
+  compassControl.addTo(map);
 
   const layers = {
     context: L.layerGroup().addTo(map),
@@ -127,6 +167,95 @@ export function createMapController() {
   routeDismissBtn?.addEventListener("click", () => hideRoutePanel());
   routeClearBtn?.addEventListener("click", () => clearSelection());
   map.on("zoomend", refreshRoadNameLabels);
+  isMobileViewport.addEventListener("change", () => {
+    updateCompassControlVisibility();
+    if (!isMobileViewport.matches && compassEnabled) {
+      disableCompassRotation();
+    }
+  });
+
+  function updateCompassControlVisibility() {
+    if (!compassButton) return;
+    const root = compassButton.parentElement;
+    if (!root) return;
+    root.style.display = isMobileViewport.matches ? "" : "none";
+  }
+
+  function applyMapRotation(deg) {
+    currentRotationDeg = ((deg % 360) + 360) % 360;
+    const panes = map.getPanes();
+    for (const key of rotatablePanes) {
+      const pane = panes[key];
+      if (!pane) continue;
+      pane.style.transformOrigin = "50% 50%";
+      pane.style.transform = `rotate(${currentRotationDeg}deg)`;
+      pane.style.transition = "transform 120ms linear";
+    }
+  }
+
+  function headingFromOrientation(evt) {
+    if (typeof evt.webkitCompassHeading === "number") {
+      return evt.webkitCompassHeading;
+    }
+    if (typeof evt.alpha === "number") {
+      return (360 - evt.alpha + 360) % 360;
+    }
+    return null;
+  }
+
+  function onDeviceOrientation(evt) {
+    if (!compassEnabled) return;
+    const heading = headingFromOrientation(evt);
+    if (heading == null) return;
+    applyMapRotation(-heading);
+  }
+
+  async function ensureCompassPermission() {
+    if (typeof DeviceOrientationEvent === "undefined") return false;
+    if (typeof DeviceOrientationEvent.requestPermission === "function") {
+      try {
+        const state = await DeviceOrientationEvent.requestPermission();
+        return state === "granted";
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function setCompassButtonState(enabled) {
+    if (!compassButton) return;
+    compassButton.classList.toggle("is-active", enabled);
+    compassButton.setAttribute("aria-pressed", enabled ? "true" : "false");
+  }
+
+  function disableCompassRotation() {
+    compassEnabled = false;
+    if (orientationListening) {
+      window.removeEventListener("deviceorientation", onDeviceOrientation);
+      orientationListening = false;
+    }
+    setCompassButtonState(false);
+    applyMapRotation(0);
+  }
+
+  async function toggleCompassRotation() {
+    if (compassEnabled) {
+      disableCompassRotation();
+      return;
+    }
+    if (!isMobileViewport.matches) return;
+    const allowed = await ensureCompassPermission();
+    if (!allowed) return;
+    compassEnabled = true;
+    setCompassButtonState(true);
+    if (!orientationListening) {
+      window.addEventListener("deviceorientation", onDeviceOrientation, {
+        passive: true,
+      });
+      orientationListening = true;
+    }
+  }
 
   function loadData(url) {
     fetch(url)
@@ -261,21 +390,34 @@ export function createMapController() {
       trafficCalming === "table" ||
       trafficCalming === "speed_table"
     ) {
-      return { icon: "⚠️", label: "Speed Bump" };
+      return { type: "speedBump", label: "Speed Bump" };
     }
     if (noExit === "yes" || noExit === "true" || noExit === "1") {
-      return { icon: "⛔", label: "No Exit" };
+      return { type: "noExit", label: "No Exit" };
     }
     return null;
   }
 
+  function obstacleIconSvg(type) {
+    const common = 'class="obstacle-pin-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"';
+    if (type === "noExit") {
+      return `<svg ${common}><path stroke="currentColor" stroke-linecap="round" stroke-width="2.6" d="m6 6 12 12m3-6a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`;
+    }
+    return `<svg ${common}><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" d="M16.881 16H7.119a1 1 0 0 1-.772-1.636l4.881-5.927a1 1 0 0 1 1.544 0l4.88 5.927a1 1 0 0 1-.77 1.636Z"/></svg>`;
+  }
+
   function createObstaclePin(latlng, pin) {
+    const toneClass =
+      pin.type === "noExit"
+        ? "obstacle-pin-badge--no-exit"
+        : "obstacle-pin-badge--speed-bump";
+    const iconHtml = obstacleIconSvg(pin.type);
     return L.marker(latlng, {
       icon: L.divIcon({
         className: "obstacle-pin",
-        html: `<span class="obstacle-pin-badge" title="${escapeHtml(pin.label)}">${pin.icon}</span>`,
+        html: `<span class="obstacle-pin-badge ${toneClass}" title="${escapeHtml(pin.label)}">${iconHtml}</span>`,
         iconSize: [28, 28],
-        iconAnchor: [14, 28],
+        iconAnchor: [14, 14],
       }),
       keyboard: false,
     }).bindTooltip(pin.label, {
@@ -344,19 +486,19 @@ export function createMapController() {
     const amenity = String(props.amenity || "");
 
     if (props.sport === "basketball" || props.leisure === "pitch") {
-      return { type: "basketball", icon: "🏀", label: "Basketball Court", score: 1 };
+      return { type: "basketball", label: "Basketball Court", score: 1 };
     }
     if (props.man_made === "water_tower") {
-      return { type: "waterTower", icon: "💧", label: "Water Tower", score: 1 };
+      return { type: "waterTower", label: "Water Tower", score: 1 };
     }
     if (amenity === "toilets") {
-      return { type: "restroom", icon: "🚻", label: "Restroom", score: 1 };
+      return { type: "restroom", label: "Restroom", score: 1 };
     }
     if (
       office.toLowerCase().includes("security") ||
       name.toLowerCase().includes("guard")
     ) {
-      return { type: "guard", icon: "🛡️", label: "Guard Shack", score: 2 };
+      return { type: "guard", label: "Guard Shack", score: 2 };
     }
     if (
       office.toLowerCase().includes("estate_agent") ||
@@ -365,24 +507,47 @@ export function createMapController() {
       name.toLowerCase().includes("admin building")
     ) {
       const score = props.category === "poi-office" ? 3 : 2;
-      return { type: "realEstate", icon: "🏢", label: "Real State Office", score };
+      return { type: "realEstate", label: "Real State Office", score };
     }
     if (name.toLowerCase().includes("model unit")) {
       return {
         type: "modelUnit",
-        icon: "🏠",
         label: "Model Unit",
         score: 2,
       };
     }
     if (props.building === "gazebo") {
-      return { type: "gazebo", icon: "🛖", label: "Gazebo", score: 2 };
+      return { type: "gazebo", label: "Gazebo", score: 2 };
     }
     if (props.building === "pavilion") {
       const score = name.toLowerCase().includes("club house") ? 3 : 1;
-      return { type: "pavilion", icon: "🏛️", label: "Pavilion", score };
+      return { type: "pavilion", label: "Pavilion", score };
     }
     return null;
+  }
+
+  function administrativeIconSvg(type) {
+    const common = 'class="admin-pin-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"';
+    switch (type) {
+      case "basketball":
+        return `<svg ${common} fill="currentColor"><path fill-rule="evenodd" d="M12 2a10 10 0 1 0 10 10A10.009 10.009 0 0 0 12 2Zm6.613 4.614a8.523 8.523 0 0 1 1.93 5.32 20.093 20.093 0 0 0-5.949-.274c-.059-.149-.122-.292-.184-.441a23.879 23.879 0 0 0-.566-1.239 11.41 11.41 0 0 0 4.769-3.366ZM10 3.707a8.82 8.82 0 0 1 2-.238 8.5 8.5 0 0 1 5.664 2.152 9.608 9.608 0 0 1-4.476 3.087A45.755 45.755 0 0 0 10 3.707Zm-6.358 6.555a8.57 8.57 0 0 1 4.73-5.981 53.99 53.99 0 0 1 3.168 4.941 32.078 32.078 0 0 1-7.9 1.04h.002Zm2.01 7.46a8.51 8.51 0 0 1-2.2-5.707v-.262a31.641 31.641 0 0 0 8.777-1.219c.243.477.477.964.692 1.449-.114.032-.227.067-.336.1a13.569 13.569 0 0 0-6.942 5.636l.009.003ZM12 20.556a8.508 8.508 0 0 1-5.243-1.8 11.717 11.717 0 0 1 6.7-5.332.509.509 0 0 1 .055-.02 35.65 35.65 0 0 1 1.819 6.476 8.476 8.476 0 0 1-3.331.676Zm4.772-1.462A37.232 37.232 0 0 0 15.113 13a12.513 12.513 0 0 1 5.321.364 8.56 8.56 0 0 1-3.66 5.73h-.002Z" clip-rule="evenodd"/></svg>`;
+      case "pavilion":
+        return `<svg ${common} fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 20v-9l-4 1.125V20h4Zm0 0h8m-8 0V6.66667M16 20v-9l4 1.125V20h-4Zm0 0V6.66667M18 8l-6-4-6 4m5 1h2m-2 3h2"/></svg>`;
+      case "waterTower":
+        return `<svg ${common} fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 6v2s-3 1-3 3.25 1 2.25 1 3-1 1.125-1 2.25V19c0 .9375 1 2 2.5 2s2-.9375 2-.9375S13 21 14.5 21s2.5-1.0625 2.5-2v-2.5c0-1.125-1-1.5-1-2.25s1-.75 1-3S14 8 14 8V6m-3 0h-1V3h5v3h-1m-3 0h3m-5.95629 6h8.91259M8 17h9"/></svg>`;
+      case "realEstate":
+        return `<svg ${common} fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M3 21h18M4 18h16M6 10v8m4-8v8m4-8v8m4-8v8M4 9.5v-.955a1 1 0 0 1 .458-.84l7-4.52a1 1 0 0 1 1.084 0l7 4.52a1 1 0 0 1 .458.84V9.5a.5.5 0 0 1-.5.5h-15a.5.5 0 0 1-.5-.5Z"/></svg>`;
+      case "restroom":
+        return `<svg ${common} fill="none"><path stroke="currentColor" stroke-linejoin="round" stroke-width="2" d="M9 5h-.16667c-.86548 0-1.70761.28071-2.4.8L3.5 8l2 3.5L8 10v9h8v-9l2.5 1.5 2-3.5-2.9333-2.2c-.6924-.51929-1.5346-.8-2.4-.8H15M9 5c0 1.5 1.5 3 3 3s3-1.5 3-3M9 5h6"/></svg>`;
+      case "guard":
+        return `<svg ${common} fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 20a16.405 16.405 0 0 1-5.092-5.804A16.694 16.694 0 0 1 5 6.666L12 4l7 2.667a16.695 16.695 0 0 1-1.908 7.529A16.406 16.406 0 0 1 12 20Z"/></svg>`;
+      case "modelUnit":
+        return `<svg ${common} fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m4 12 8-8 8 8M6 10.5V19a1 1 0 0 0 1 1h3v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3h3a1 1 0 0 0 1-1v-8.5"/></svg>`;
+      case "gazebo":
+        return `<svg ${common} fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M4.5 17H4a1 1 0 0 1-1-1 3 3 0 0 1 3-3h1m0-3.05A2.5 2.5 0 1 1 9 5.5M19.5 17h.5a1 1 0 0 0 1-1 3 3 0 0 0-3-3h-1m0-3.05a2.5 2.5 0 1 0-2-4.45m.5 13.5h-7a1 1 0 0 1-1-1 3 3 0 0 1 3-3h3a3 3 0 0 1 3 3 1 1 0 0 1-1 1Zm-1-9.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z"/></svg>`;
+      default:
+        return "";
+    }
   }
 
   function featureCenterLatLng(feature) {
@@ -406,10 +571,11 @@ export function createMapController() {
   }
 
   function createAdministrativePin(latlng, pin) {
+    const iconHtml = administrativeIconSvg(pin.type);
     return L.marker(latlng, {
       icon: L.divIcon({
         className: "admin-pin",
-        html: `<span class="admin-pin-badge" title="${escapeHtml(pin.label)}">${pin.icon}</span>`,
+        html: `<span class="admin-pin-badge" title="${escapeHtml(pin.label)}">${iconHtml}</span>`,
         iconSize: [28, 28],
         iconAnchor: [14, 28],
       }),
