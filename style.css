@@ -54,6 +54,10 @@ body {
 }
 
 .search button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 6px;
@@ -75,6 +79,16 @@ body {
   cursor: not-allowed;
 }
 
+.find-toggle-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+}
+
+.find-toggle-label {
+  display: inline;
+}
+
 .search-separator {
   width: 1px;
   align-self: stretch;
@@ -86,6 +100,10 @@ body {
 }
 
 .layers-menu > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 6px;
@@ -99,6 +117,16 @@ body {
 
 .layers-menu > button:hover {
   background: #2559ac;
+}
+
+.layers-toggle-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+}
+
+.layers-toggle-label {
+  display: inline;
 }
 
 .layers-panel {
@@ -596,8 +624,95 @@ main {
 }
 
 @media (max-width: 720px) {
+  .search {
+    top: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 0.55rem);
+    left: 0.65rem;
+    right: 0.65rem;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.34rem;
+    align-items: stretch;
+    padding: 0.38rem;
+    border-radius: 12px;
+    background: rgba(255, 253, 249, 0.82);
+    border: 1px solid rgba(195, 180, 156, 0.55);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+
+  .search-separator {
+    display: none;
+  }
+
+  .search select,
+  .search button {
+    width: auto;
+    min-width: 0;
+    height: 2.45rem;
+    font-size: 0.78rem;
+    border-radius: 10px;
+  }
+
+  #block-select,
+  #lot-select {
+    flex: 1 1 0;
+  }
+
+  .search > button[type="submit"] {
+    flex: 0 0 auto;
+    width: 2.45rem;
+    min-width: 2.45rem;
+    padding: 0;
+    white-space: nowrap;
+  }
+
+  .find-toggle-icon {
+    display: inline-block;
+  }
+
+  .find-toggle-label {
+    display: none;
+  }
+
+  .search select {
+    padding: 0.28rem 0.5rem;
+  }
+
+  .layers-menu {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: auto;
+    z-index: 1000;
+  }
+
+  .layers-menu > button {
+    width: 2.45rem;
+    height: 2.45rem;
+    min-width: 2.45rem;
+    padding: 0;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+  }
+
+  .layers-toggle-icon {
+    display: inline-block;
+  }
+
+  .layers-toggle-label {
+    display: none;
+  }
+
+  .layers-panel {
+    top: auto;
+    right: 0;
+    bottom: calc(100% + 0.45rem);
+  }
+
   .reroute-banner {
-    top: 3.95rem;
+    top: 4.35rem;
     width: min(320px, calc(100vw - 2rem));
     font-size: 0.78rem;
     padding: 0.46rem 0.64rem;
@@ -608,7 +723,7 @@ main {
     right: 0;
     margin: 0 auto;
     width: min(390px, calc(100vw - 1.5rem));
-    bottom: 0.75rem;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.25rem);
   }
 
   .recenter-control {
