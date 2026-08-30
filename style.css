@@ -54,6 +54,10 @@ body {
 }
 
 .search button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 6px;
@@ -73,6 +77,16 @@ body {
   background: #7ea48f;
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.find-toggle-icon {
+  display: none;
+  width: 20px;
+  height: 20px;
+}
+
+.find-toggle-label {
+  display: inline;
 }
 
 .search-separator {
@@ -648,8 +662,18 @@ main {
 
   .search > button[type="submit"] {
     flex: 0 0 auto;
-    padding: 0.5rem 0.8rem;
+    width: 2.45rem;
+    min-width: 2.45rem;
+    padding: 0;
     white-space: nowrap;
+  }
+
+  .find-toggle-icon {
+    display: inline-block;
+  }
+
+  .find-toggle-label {
+    display: none;
   }
 
   .search select {
