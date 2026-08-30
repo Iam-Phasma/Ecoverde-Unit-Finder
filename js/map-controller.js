@@ -32,20 +32,6 @@ export function createMapController() {
     maxZoom: 22,
   });
 
-  const isMobileViewport = window.matchMedia("(max-width: 720px)");
-  const rotatablePanes = [
-    "tilePane",
-    "overlayPane",
-    "shadowPane",
-    "markerPane",
-    "tooltipPane",
-    "popupPane",
-  ];
-  let compassEnabled = false;
-  let orientationListening = false;
-  let currentRotationDeg = 0;
-  let compassButton = null;
-
   const navControl = L.control({ position: "bottomright" });
   navControl.onAdd = function () {
     const container = L.DomUtil.create(
@@ -90,32 +76,6 @@ export function createMapController() {
     return container;
   };
   navControl.addTo(map);
-
-  const compassControl = L.control({ position: "bottomright" });
-  compassControl.onAdd = function () {
-    const container = L.DomUtil.create(
-      "div",
-      "leaflet-bar leaflet-control compass-toggle-control",
-    );
-    const button = L.DomUtil.create("a", "", container);
-    button.href = "#";
-    button.title = "Auto-rotate by compass";
-    button.setAttribute("role", "button");
-    button.setAttribute("aria-label", "Auto-rotate by compass");
-    button.setAttribute("aria-pressed", "false");
-    button.innerHTML =
-      '<svg class="compass-glyph-svg" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2a1 1 0 0 1 .932.638l7 18a1 1 0 0 1-1.326 1.281L13 19.517V13a1 1 0 1 0-2 0v6.517l-5.606 2.402a1 1 0 0 1-1.326-1.281l7-18A1 1 0 0 1 12 2Z" clip-rule="evenodd"/></svg>';
-    compassButton = button;
-
-    L.DomEvent.disableClickPropagation(container);
-    L.DomEvent.on(button, "click", async (e) => {
-      L.DomEvent.preventDefault(e);
-      await toggleCompassRotation();
-    });
-    updateCompassControlVisibility();
-    return container;
-  };
-  compassControl.addTo(map);
 
   const layers = {
     context: L.layerGroup().addTo(map),
@@ -184,95 +144,6 @@ export function createMapController() {
   });
   updateRerouteButtonState();
   map.on("zoomend", refreshRoadNameLabels);
-  isMobileViewport.addEventListener("change", () => {
-    updateCompassControlVisibility();
-    if (!isMobileViewport.matches && compassEnabled) {
-      disableCompassRotation();
-    }
-  });
-
-  function updateCompassControlVisibility() {
-    if (!compassButton) return;
-    const root = compassButton.parentElement;
-    if (!root) return;
-    root.style.display = isMobileViewport.matches ? "" : "none";
-  }
-
-  function applyMapRotation(deg) {
-    currentRotationDeg = ((deg % 360) + 360) % 360;
-    const panes = map.getPanes();
-    for (const key of rotatablePanes) {
-      const pane = panes[key];
-      if (!pane) continue;
-      pane.style.transformOrigin = "50% 50%";
-      pane.style.transform = `rotate(${currentRotationDeg}deg)`;
-      pane.style.transition = "transform 120ms linear";
-    }
-  }
-
-  function headingFromOrientation(evt) {
-    if (typeof evt.webkitCompassHeading === "number") {
-      return evt.webkitCompassHeading;
-    }
-    if (typeof evt.alpha === "number") {
-      return (360 - evt.alpha + 360) % 360;
-    }
-    return null;
-  }
-
-  function onDeviceOrientation(evt) {
-    if (!compassEnabled) return;
-    const heading = headingFromOrientation(evt);
-    if (heading == null) return;
-    applyMapRotation(-heading);
-  }
-
-  async function ensureCompassPermission() {
-    if (typeof DeviceOrientationEvent === "undefined") return false;
-    if (typeof DeviceOrientationEvent.requestPermission === "function") {
-      try {
-        const state = await DeviceOrientationEvent.requestPermission();
-        return state === "granted";
-      } catch {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  function setCompassButtonState(enabled) {
-    if (!compassButton) return;
-    compassButton.classList.toggle("is-active", enabled);
-    compassButton.setAttribute("aria-pressed", enabled ? "true" : "false");
-  }
-
-  function disableCompassRotation() {
-    compassEnabled = false;
-    if (orientationListening) {
-      window.removeEventListener("deviceorientation", onDeviceOrientation);
-      orientationListening = false;
-    }
-    setCompassButtonState(false);
-    applyMapRotation(0);
-  }
-
-  async function toggleCompassRotation() {
-    if (compassEnabled) {
-      disableCompassRotation();
-      return;
-    }
-    if (!isMobileViewport.matches) return;
-    const allowed = await ensureCompassPermission();
-    if (!allowed) return;
-    compassEnabled = true;
-    setCompassButtonState(true);
-    if (!orientationListening) {
-      window.addEventListener("deviceorientation", onDeviceOrientation, {
-        passive: true,
-      });
-      orientationListening = true;
-    }
-  }
 
   function loadData(url) {
     fetch(url)
