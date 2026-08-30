@@ -49,7 +49,7 @@ export function createMapController() {
     zoomIn.setAttribute("role", "button");
     zoomIn.setAttribute("aria-label", "Zoom in");
     zoomIn.innerHTML =
-      '<svg class="zoom-tool-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7 7V5"/></svg>';
+      '<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7 7V5"/></svg>';
 
     const center = L.DomUtil.create("a", "", container);
     center.href = "#";
@@ -57,7 +57,7 @@ export function createMapController() {
     center.setAttribute("role", "button");
     center.setAttribute("aria-label", "Center map");
     center.innerHTML =
-      '<svg class="zoom-tool-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h4V4m12 4h-4V4M4 16h4v4m12-4h-4v4"/></svg>';
+      '<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h4V4m12 4h-4V4M4 16h4v4m12-4h-4v4"/></svg>';
 
     const zoomOut = L.DomUtil.create("a", "", container);
     zoomOut.href = "#";
@@ -65,7 +65,7 @@ export function createMapController() {
     zoomOut.setAttribute("role", "button");
     zoomOut.setAttribute("aria-label", "Zoom out");
     zoomOut.innerHTML =
-      '<svg class="zoom-tool-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"/></svg>';
+      '<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"/></svg>';
 
     L.DomEvent.disableClickPropagation(container);
     L.DomEvent.on(zoomIn, "click", (e) => {

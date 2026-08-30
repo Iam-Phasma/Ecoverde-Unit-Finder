@@ -402,11 +402,14 @@ main {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: var(--ink);
+  line-height: 1;
+  font-size: 0;
 }
 
-.zoom-tool-icon {
-  width: 16px;
-  height: 16px;
+.recenter-control a svg {
+  width: 20px;
+  height: 20px;
   display: block;
 }
 
