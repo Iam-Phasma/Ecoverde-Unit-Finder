@@ -363,9 +363,9 @@ export function createMapController() {
     map.setMaxBounds(dataBounds.pad(0.5));
     updateMinZoom();
     window.addEventListener("resize", updateMinZoom);
-    refreshRoadNameLabels();
     populateObstaclePins(collection.features);
     populateAdministrativePins(collection.features);
+    refreshRoadNameLabels();
   }
 
   function populateObstaclePins(features) {
@@ -692,11 +692,88 @@ export function createMapController() {
     });
   }
 
+  function estimateRoadLabelSize(name) {
+    const text = String(name || "");
+    const width = Math.max(56, Math.min(210, text.length * 7.1 + 18));
+    return { width, height: 24 };
+  }
+
+  function boxIntersects(a, b) {
+    return !(
+      a.right <= b.left ||
+      a.left >= b.right ||
+      a.bottom <= b.top ||
+      a.top >= b.bottom
+    );
+  }
+
+  function roadLabelBoxAt(point, size) {
+    const halfW = size.width / 2;
+    const halfH = size.height / 2;
+    return {
+      left: point.x - halfW,
+      right: point.x + halfW,
+      top: point.y - halfH,
+      bottom: point.y + halfH,
+    };
+  }
+
+  function collectObstacleBoxesPx() {
+    const boxes = [];
+    layers.obstacle.eachLayer((layer) => {
+      if (!layer?.getLatLng) return;
+      const ll = layer.getLatLng();
+      const pt = map.latLngToContainerPoint(ll);
+      const r = 18;
+      boxes.push({
+        left: pt.x - r,
+        right: pt.x + r,
+        top: pt.y - r,
+        bottom: pt.y + r,
+      });
+    });
+    return boxes;
+  }
+
+  function findRoadLabelPlacement(latlng, name, obstacleBoxes, usedLabelBoxes) {
+    const center = map.latLngToContainerPoint(latlng);
+    const size = estimateRoadLabelSize(name);
+    const offsets = [
+      [0, 0],
+      [0, -30],
+      [0, 30],
+      [30, 0],
+      [-30, 0],
+      [24, -24],
+      [-24, -24],
+      [24, 24],
+      [-24, 24],
+      [42, 0],
+      [-42, 0],
+      [0, -42],
+      [0, 42],
+    ];
+
+    for (const [dx, dy] of offsets) {
+      const candidate = L.point(center.x + dx, center.y + dy);
+      const box = roadLabelBoxAt(candidate, size);
+      const blockedByObstacle = obstacleBoxes.some((b) => boxIntersects(box, b));
+      if (blockedByObstacle) continue;
+      const blockedByLabel = usedLabelBoxes.some((b) => boxIntersects(box, b));
+      if (blockedByLabel) continue;
+      return { latlng: map.containerPointToLatLng(candidate), box };
+    }
+
+    return null;
+  }
+
   function refreshRoadNameLabels() {
     layers.roadNames.clearLayers();
     if (!map.hasLayer(layers.roadNames) || roadNameCandidates.length === 0) return;
 
     const thresholdMeters = pixelsToMeters(mergePixelsForZoom(map.getZoom()));
+    const obstacleBoxes = collectObstacleBoxesPx();
+    const usedLabelBoxes = [];
     const byName = new Map();
     for (const candidate of roadNameCandidates) {
       if (!byName.has(candidate.name)) byName.set(candidate.name, []);
@@ -708,8 +785,16 @@ export function createMapController() {
       for (const point of points) {
         const tooClose = kept.some((k) => k.distanceTo(point) < thresholdMeters);
         if (tooClose) continue;
+        const placed = findRoadLabelPlacement(
+          point,
+          name,
+          obstacleBoxes,
+          usedLabelBoxes,
+        );
+        if (!placed) continue;
         kept.push(point);
-        layers.roadNames.addLayer(createRoadNameLabel(point, name));
+        usedLabelBoxes.push(placed.box);
+        layers.roadNames.addLayer(createRoadNameLabel(placed.latlng, name));
       }
     }
   }
