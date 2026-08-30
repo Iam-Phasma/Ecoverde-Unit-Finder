@@ -25,11 +25,11 @@ document.addEventListener("click", (e) => {
 });
 
 layerObstacle.addEventListener("change", () => {
-  // Intentionally no-op for now.
+  controller.setLayerVisibility("obstacle", layerObstacle.checked);
 });
 
 layerAdministrative.addEventListener("change", () => {
-  // Intentionally no-op for now.
+  controller.setLayerVisibility("administrative", layerAdministrative.checked);
 });
 
 layerRoadNames.addEventListener("change", () => {
@@ -38,6 +38,8 @@ layerRoadNames.addEventListener("change", () => {
 
 // Default state: all optional layers are off.
 controller.setLayerVisibility("roadNames", layerRoadNames.checked);
+controller.setLayerVisibility("administrative", layerAdministrative.checked);
+controller.setLayerVisibility("obstacle", layerObstacle.checked);
 
 searchForm.addEventListener("submit", (e) => {
   e.preventDefault();

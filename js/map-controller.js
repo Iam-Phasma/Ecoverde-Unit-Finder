@@ -87,6 +87,8 @@ export function createMapController() {
     contextRoadsCasing: L.layerGroup().addTo(map),
     contextRoads: L.layerGroup().addTo(map),
     contextRoadsCenter: L.layerGroup().addTo(map),
+    obstacle: L.layerGroup(),
+    administrative: L.layerGroup(),
     buildings: L.layerGroup().addTo(map),
     barriers: L.layerGroup().addTo(map),
     pois: L.layerGroup().addTo(map),
@@ -136,6 +138,8 @@ export function createMapController() {
   function renderData(collection) {
     layers.leisureDots.clearLayers();
     layers.roadNames.clearLayers();
+    layers.obstacle.clearLayers();
+    layers.administrative.clearLayers();
     roadNameByEdge = new Map();
     roadNameCandidates = [];
     const lotsByBlock = new Map(); // block -> Set(lot)
@@ -229,6 +233,143 @@ export function createMapController() {
     updateMinZoom();
     window.addEventListener("resize", updateMinZoom);
     refreshRoadNameLabels();
+    populateObstaclePins(collection.features);
+    populateAdministrativePins(collection.features);
+  }
+
+  function populateObstaclePins(features) {
+    if (!Array.isArray(features)) return;
+    for (const feature of features) {
+      const pin = obstaclePinMetaForFeature(feature);
+      if (!pin) continue;
+      const latlng = featureCenterLatLng(feature);
+      if (!latlng) continue;
+      layers.obstacle.addLayer(createObstaclePin(latlng, pin));
+    }
+  }
+
+  function obstaclePinMetaForFeature(feature) {
+    const props = feature?.properties || {};
+    const trafficCalming = String(props.traffic_calming || "").toLowerCase();
+    const noExit = String(props.noexit || props.no_exit || "").toLowerCase();
+
+    if (
+      trafficCalming === "hump" ||
+      trafficCalming === "speed_bump" ||
+      trafficCalming === "speed hump" ||
+      trafficCalming === "bump" ||
+      trafficCalming === "table" ||
+      trafficCalming === "speed_table"
+    ) {
+      return { icon: "⚠️", label: "Speed Bump" };
+    }
+    if (noExit === "yes" || noExit === "true" || noExit === "1") {
+      return { icon: "⛔", label: "No Exit" };
+    }
+    return null;
+  }
+
+  function createObstaclePin(latlng, pin) {
+    return L.marker(latlng, {
+      icon: L.divIcon({
+        className: "obstacle-pin",
+        html: `<span class="obstacle-pin-badge" title="${escapeHtml(pin.label)}">${pin.icon}</span>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+      }),
+      keyboard: false,
+    }).bindTooltip(pin.label, {
+      direction: "top",
+      offset: [0, -20],
+      opacity: 0.92,
+    });
+  }
+
+  function populateAdministrativePins(features) {
+    if (!Array.isArray(features)) return;
+    const bestByType = new Map();
+    for (const feature of features) {
+      const pin = pinMetaForFeature(feature);
+      if (!pin) continue;
+      const existing = bestByType.get(pin.type);
+      if (!existing || pin.score > existing.pin.score) {
+        bestByType.set(pin.type, { feature, pin });
+      }
+    }
+
+    for (const { feature, pin } of bestByType.values()) {
+      const latlng = featureCenterLatLng(feature);
+      if (!latlng) continue;
+      layers.administrative.addLayer(createAdministrativePin(latlng, pin));
+    }
+  }
+
+  function pinMetaForFeature(feature) {
+    const props = feature?.properties || {};
+    const name = String(props.name || "");
+    const office = String(props.office || "");
+    const amenity = String(props.amenity || "");
+
+    if (props.sport === "basketball" || props.leisure === "pitch") {
+      return { type: "basketball", icon: "🏀", label: "Basketball Court", score: 1 };
+    }
+    if (props.man_made === "water_tower") {
+      return { type: "waterTower", icon: "🗼", label: "Water Tower", score: 1 };
+    }
+    if (amenity === "toilets") {
+      return { type: "restroom", icon: "🚻", label: "Restroom", score: 1 };
+    }
+    if (
+      office.toLowerCase().includes("security") ||
+      name.toLowerCase().includes("guard")
+    ) {
+      return { type: "guard", icon: "🛡️", label: "Guard Shack", score: 2 };
+    }
+    if (
+      office.toLowerCase().includes("estate_agent") ||
+      name.toLowerCase().includes("real estate") ||
+      name.toLowerCase().includes("admin building")
+    ) {
+      const score = props.category === "poi-office" ? 3 : 2;
+      return { type: "realEstate", icon: "🏢", label: "Real Estate Office", score };
+    }
+    return null;
+  }
+
+  function featureCenterLatLng(feature) {
+    const geometry = feature?.geometry;
+    if (!geometry || !geometry.type) return null;
+
+    if (geometry.type === "Point") {
+      const [lng, lat] = geometry.coordinates || [];
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return L.latLng(lat, lng);
+    }
+
+    if (geometry.type === "Polygon" || geometry.type === "MultiPolygon") {
+      const polygonLayer = L.geoJSON(feature);
+      const bounds = polygonLayer.getBounds && polygonLayer.getBounds();
+      if (!bounds || !bounds.isValid()) return null;
+      return bounds.getCenter();
+    }
+
+    return null;
+  }
+
+  function createAdministrativePin(latlng, pin) {
+    return L.marker(latlng, {
+      icon: L.divIcon({
+        className: "admin-pin",
+        html: `<span class="admin-pin-badge" title="${escapeHtml(pin.label)}">${pin.icon}</span>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+      }),
+      keyboard: false,
+    }).bindTooltip(pin.label, {
+      direction: "top",
+      offset: [0, -20],
+      opacity: 0.92,
+    });
   }
 
   function addLeisureTextureDots(layer) {
@@ -393,7 +534,9 @@ export function createMapController() {
 
   function setLayerVisibility(key, visible) {
     const mapping = {
+      obstacle: layers.obstacle,
       roadNames: layers.roadNames,
+      administrative: layers.administrative,
     };
     const layerGroup = mapping[key];
     if (!layerGroup) return;

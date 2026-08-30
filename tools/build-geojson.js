@@ -104,6 +104,8 @@ for (const el of raw.elements) {
         ? "poi-office"
         : tags.natural === "tree"
           ? "poi-tree"
+          : tags.traffic_calming || tags.noexit || tags.no_exit
+            ? "poi-obstacle"
         : tags.leisure
           ? "poi-leisure"
           : null;
