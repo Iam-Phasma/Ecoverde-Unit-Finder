@@ -2,6 +2,7 @@
 // the draggable gate marker, and unit/block highlight + ETA popup behavior.
 import {
   buildRoadGraph,
+  connectSnapNodesIfSameSegment,
   findGateNodeKey,
   findRoute,
   largestComponentKeys,
@@ -20,6 +21,7 @@ import {
 import { escapeHtml, numericCompare } from "./utils.js";
 
 const ETA_SPEEDS_KMH = { car: 20, bicycle: 15, walk: 5 };
+const MIN_REPOSITION_ROUTE_KM = 0.01;
 
 export function createMapController() {
   const map = L.map("map", {
@@ -822,6 +824,29 @@ export function createMapController() {
     if (!roadGraph) return;
     const newKey = snapPointToGraph(roadGraph, [latlng.lng, latlng.lat], mainRoadComponent);
     if (!newKey) return;
+
+    if (activeDest?.destCenter) {
+      const destSnapKey = snapPointToGraph(
+        roadGraph,
+        [activeDest.destCenter.lng, activeDest.destCenter.lat],
+        mainRoadComponent,
+      );
+      if (destSnapKey) {
+        connectSnapNodesIfSameSegment(roadGraph, newKey, destSnapKey);
+        const trialRoute = findRoute(roadGraph, newKey, destSnapKey);
+        unsnapPoint(roadGraph, destSnapKey);
+        const trialKm = (trialRoute?.distance || 0) / 1000;
+        if (trialKm <= MIN_REPOSITION_ROUTE_KM) {
+          unsnapPoint(roadGraph, newKey);
+          if (gateNodeKey && roadGraph.nodes.has(gateNodeKey) && gateMarker) {
+            const [oldLon, oldLat] = roadGraph.nodes.get(gateNodeKey);
+            gateMarker.setLatLng([oldLat, oldLon]);
+          }
+          return;
+        }
+      }
+    }
+
     if (gateNodeKey) unsnapPoint(roadGraph, gateNodeKey);
     gateNodeKey = newKey;
     gateMoved = true;
@@ -842,7 +867,10 @@ export function createMapController() {
     let destSnapKey = null;
     if (roadGraph && gateNodeKey && destCenter) {
       destSnapKey = snapPointToGraph(roadGraph, [destCenter.lng, destCenter.lat], mainRoadComponent);
-      if (destSnapKey) route = findRoute(roadGraph, gateNodeKey, destSnapKey);
+      if (destSnapKey) {
+        connectSnapNodesIfSameSegment(roadGraph, gateNodeKey, destSnapKey);
+        route = findRoute(roadGraph, gateNodeKey, destSnapKey);
+      }
     }
 
     if (route) {

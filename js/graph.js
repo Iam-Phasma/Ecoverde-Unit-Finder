@@ -28,7 +28,7 @@ function coordKey(coord) {
 
 /** Undirected graph of drivable road segments (footways/paths excluded), keyed by rounded "lon,lat" coordinate, for routing. */
 export function buildRoadGraph(features) {
-  const graph = { nodes: new Map(), adj: new Map() };
+  const graph = { nodes: new Map(), adj: new Map(), snapMeta: new Map() };
 
   function ensureNode(coord) {
     const key = coordKey(coord);
@@ -92,6 +92,11 @@ export function snapPointToGraph(graph, coord, allowedKeys) {
   const distA = haversineMeters(best.point, graph.nodes.get(best.aKey));
   const distB = haversineMeters(best.point, graph.nodes.get(best.bKey));
   graph.nodes.set(snapKey, best.point);
+  const edgeKey =
+    best.aKey < best.bKey
+      ? `${best.aKey}|${best.bKey}`
+      : `${best.bKey}|${best.aKey}`;
+  graph.snapMeta?.set(snapKey, { edgeKey, aKey: best.aKey, bKey: best.bKey });
   graph.adj.set(snapKey, [
     { to: best.aKey, dist: distA },
     { to: best.bKey, dist: distB },
@@ -112,6 +117,25 @@ export function unsnapPoint(graph, snapKey) {
   }
   graph.adj.delete(snapKey);
   graph.nodes.delete(snapKey);
+  graph.snapMeta?.delete(snapKey);
+}
+
+/** Connects two snapped nodes directly when both come from the same source road segment. */
+export function connectSnapNodesIfSameSegment(graph, aKey, bKey) {
+  if (!graph?.nodes?.has(aKey) || !graph?.nodes?.has(bKey)) return false;
+  const aMeta = graph.snapMeta?.get(aKey);
+  const bMeta = graph.snapMeta?.get(bKey);
+  if (!aMeta || !bMeta || aMeta.edgeKey !== bMeta.edgeKey) return false;
+
+  const aCoord = graph.nodes.get(aKey);
+  const bCoord = graph.nodes.get(bKey);
+  const dist = haversineMeters(aCoord, bCoord);
+
+  const aEdges = graph.adj.get(aKey) || [];
+  const bEdges = graph.adj.get(bKey) || [];
+  if (!aEdges.some((e) => e.to === bKey)) aEdges.push({ to: bKey, dist });
+  if (!bEdges.some((e) => e.to === aKey)) bEdges.push({ to: aKey, dist });
+  return true;
 }
 
 /** Returns the keys of the largest connected component, so routing never snaps to a small, disconnected cluster of road ways. */
