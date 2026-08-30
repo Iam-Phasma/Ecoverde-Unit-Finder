@@ -851,7 +851,7 @@ export function createMapController() {
     avoidMode = true;
     updateRerouteButtonState();
     if (isPhoneViewport.matches) {
-      hideRoutePanel({ immediate: true });
+      hideRoutePanel();
     }
 
     if (avoidPickHandler) {
