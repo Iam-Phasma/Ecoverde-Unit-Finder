@@ -257,12 +257,30 @@ main {
 }
 
 .route-marker {
-  font-size: 1.1rem;
-  line-height: 1;
-  text-align: center;
-  transform: translate(-2px, -2px);
+  background: transparent;
+  border: 0;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
   pointer-events: none;
+}
+
+.route-marker-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e0a800;
+  border: 2px solid #fff;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.route-marker-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .gate-marker-handle {
