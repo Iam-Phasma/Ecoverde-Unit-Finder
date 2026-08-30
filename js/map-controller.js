@@ -31,6 +31,7 @@ export function createMapController() {
     minZoom: 15,
     maxZoom: 22,
   });
+  const isPhoneViewport = window.matchMedia("(max-width: 720px)");
 
   const navControl = L.control({ position: "bottomright" });
   navControl.onAdd = function () {
@@ -849,6 +850,9 @@ export function createMapController() {
     if (!activeDest || !roadGraph || !gateNodeKey || avoidMode) return;
     avoidMode = true;
     updateRerouteButtonState();
+    if (isPhoneViewport.matches) {
+      hideRoutePanel({ immediate: true });
+    }
 
     if (avoidPickHandler) {
       map.off("click", avoidPickHandler);
@@ -1146,8 +1150,18 @@ export function createMapController() {
     routePanel.classList.add("is-visible");
   }
 
-  function hideRoutePanel() {
+  function hideRoutePanel(options = {}) {
+    const { immediate = false } = options;
     if (!routePanel) return;
+    if (panelHideTimer) {
+      clearTimeout(panelHideTimer);
+      panelHideTimer = null;
+    }
+    if (immediate) {
+      routePanel.classList.remove("is-visible", "is-hiding");
+      routePanel.classList.add("hidden");
+      return;
+    }
     if (routePanel.classList.contains("hidden") || routePanel.classList.contains("is-hiding")) return;
     routePanel.classList.remove("is-visible");
     routePanel.classList.add("is-hiding");
