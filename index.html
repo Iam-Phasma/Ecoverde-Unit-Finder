@@ -13,6 +13,9 @@
   <body>
     <main>
       <div id="map"></div>
+      <div id="reroute-banner" class="reroute-banner hidden" role="status" aria-live="polite">
+        Tap the road segment you want to avoid.
+      </div>
       <form id="search-form" class="search" autocomplete="off">
         <select id="block-select" aria-label="Block">
           <option value="">Block</option>
@@ -20,7 +23,7 @@
         <select id="lot-select" aria-label="Lot" disabled>
           <option value="">Lot</option>
         </select>
-        <button type="submit">Find</button>
+        <button type="submit" title="Find selected block or lot">Find</button>
         <span class="search-separator" aria-hidden="true"></span>
         <div class="layers-menu">
           <button
@@ -29,6 +32,7 @@
             aria-haspopup="true"
             aria-expanded="false"
             aria-label="Layer"
+            title="Show or hide map layers"
           >
             Layer
           </button>
@@ -59,10 +63,13 @@
           <div id="route-narrative" class="route-narrative"></div>
         </div>
         <div class="route-panel-section route-actions">
-          <button type="button" id="route-clear" class="eta-clear" aria-label="Clear route">
+          <button type="button" id="route-clear" class="eta-clear" aria-label="Clear route" title="Clear route and selection">
             Clear route
           </button>
-          <button type="button" id="route-dismiss" class="eta-dismiss" aria-label="Dismiss">
+          <button type="button" id="route-reroute" class="eta-reroute" aria-label="Re-route" title="Pick a road point to avoid and recalculate route">
+            Re-route
+          </button>
+          <button type="button" id="route-dismiss" class="eta-dismiss" aria-label="Dismiss" title="Close route panel">
             Dismiss
           </button>
         </div>

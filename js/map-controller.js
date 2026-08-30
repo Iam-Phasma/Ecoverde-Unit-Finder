@@ -22,6 +22,7 @@ import { escapeHtml, numericCompare } from "./utils.js";
 
 const ETA_SPEEDS_KMH = { car: 20, bicycle: 15, walk: 5 };
 const MIN_REPOSITION_ROUTE_KM = 0.01;
+const ROAD_TAP_MAX_SNAP_PX = 16;
 
 export function createMapController() {
   const map = L.map("map", {
@@ -149,6 +150,8 @@ export function createMapController() {
   const routeNarrativeEl = document.getElementById("route-narrative");
   const routeDismissBtn = document.getElementById("route-dismiss");
   const routeClearBtn = document.getElementById("route-clear");
+  const routeRerouteBtn = document.getElementById("route-reroute");
+  const rerouteBanner = document.getElementById("reroute-banner");
 
   let highlighted = null;
   let dataBounds = null;
@@ -164,10 +167,22 @@ export function createMapController() {
   let routeAnimId = null;
   let activeDest = null; // { destCenter, bounds } for the currently highlighted building
   let lastEtaInfo = null; // { latlng, distanceMeters, pathLatLngs } for reopening route details
+  let avoidMode = false;
+  let avoidMarker = null;
+  let avoidedEdgeKeys = new Set();
+  let avoidPickHandler = null;
   let panelHideTimer = null;
 
   routeDismissBtn?.addEventListener("click", () => hideRoutePanel());
   routeClearBtn?.addEventListener("click", () => clearSelection());
+  routeRerouteBtn?.addEventListener("click", () => {
+    if (avoidMode) {
+      endAvoidRoadPickMode();
+      return;
+    }
+    beginAvoidRoadPick();
+  });
+  updateRerouteButtonState();
   map.on("zoomend", refreshRoadNameLabels);
   isMobileViewport.addEventListener("change", () => {
     updateCompassControlVisibility();
@@ -875,14 +890,163 @@ export function createMapController() {
     }
   }
 
-  function clearRoute() {
+  function updateRerouteButtonState() {
+    if (!routeRerouteBtn) return;
+    routeRerouteBtn.disabled = !activeDest;
+    routeRerouteBtn.textContent = avoidMode ? "Cancel" : "Re-route";
+    routeRerouteBtn.title = avoidMode
+      ? "Cancel road selection"
+      : "Pick a road point to avoid and recalculate route";
+
+    if (routeClearBtn) routeClearBtn.disabled = avoidMode;
+    if (routeDismissBtn) routeDismissBtn.disabled = avoidMode;
+
+    if (rerouteBanner) {
+      rerouteBanner.classList.toggle("hidden", !avoidMode);
+    }
+  }
+
+  function clearAvoidance() {
+    avoidedEdgeKeys.clear();
+    if (avoidMarker) {
+      layers.route.removeLayer(avoidMarker);
+      avoidMarker = null;
+    }
+  }
+
+  function endAvoidRoadPickMode() {
+    if (avoidPickHandler) {
+      map.off("click", avoidPickHandler);
+      avoidPickHandler = null;
+    }
+    avoidMode = false;
+    updateRerouteButtonState();
+  }
+
+  function clearAvoidanceAndReroute() {
+    clearAvoidance();
+    if (activeDest) {
+      showRoute({ fromReroute: true });
+    }
+  }
+
+  function removeBlockedEdgesForRouting(blockedEdgeKeys) {
+    if (!roadGraph || !blockedEdgeKeys || blockedEdgeKeys.size === 0) {
+      return () => {};
+    }
+
+    const removed = [];
+    for (const edgeKey of blockedEdgeKeys) {
+      const parts = String(edgeKey).split("|");
+      if (parts.length !== 2) continue;
+      const [a, b] = parts;
+      const aEdges = roadGraph.adj.get(a);
+      const bEdges = roadGraph.adj.get(b);
+      if (!aEdges || !bEdges) continue;
+
+      for (let i = aEdges.length - 1; i >= 0; i--) {
+        if (aEdges[i].to === b) {
+          removed.push({ from: a, edge: aEdges[i] });
+          aEdges.splice(i, 1);
+        }
+      }
+      for (let i = bEdges.length - 1; i >= 0; i--) {
+        if (bEdges[i].to === a) {
+          removed.push({ from: b, edge: bEdges[i] });
+          bEdges.splice(i, 1);
+        }
+      }
+    }
+
+    return () => {
+      for (const item of removed) {
+        const edges = roadGraph.adj.get(item.from);
+        if (!edges) continue;
+        edges.push(item.edge);
+      }
+    };
+  }
+
+  function runRouteWithAvoidance(startKey, endKey) {
+    const restore = removeBlockedEdgesForRouting(avoidedEdgeKeys);
+    const route = findRoute(roadGraph, startKey, endKey);
+    restore();
+    return route;
+  }
+
+  function beginAvoidRoadPick() {
+    if (!activeDest || !roadGraph || !gateNodeKey || avoidMode) return;
+    avoidMode = true;
+    updateRerouteButtonState();
+
+    if (avoidPickHandler) {
+      map.off("click", avoidPickHandler);
+      avoidPickHandler = null;
+    }
+
+    avoidPickHandler = (evt) => {
+      if (!avoidMode || !evt?.latlng) return;
+
+      const snapKey = snapPointToGraph(
+        roadGraph,
+        [evt.latlng.lng, evt.latlng.lat],
+        mainRoadComponent,
+      );
+      if (!snapKey) return;
+
+      const snapMeta = roadGraph.snapMeta?.get(snapKey);
+      const snapCoord = roadGraph.nodes.get(snapKey);
+      if (!snapMeta?.edgeKey || !snapCoord) {
+        unsnapPoint(roadGraph, snapKey);
+        return;
+      }
+
+      const tapPoint = map.latLngToContainerPoint(evt.latlng);
+      const snapLatLng = L.latLng(snapCoord[1], snapCoord[0]);
+      const snappedPoint = map.latLngToContainerPoint(snapLatLng);
+      const tapDistancePx = tapPoint.distanceTo(snappedPoint);
+      if (tapDistancePx > ROAD_TAP_MAX_SNAP_PX) {
+        unsnapPoint(roadGraph, snapKey);
+        return;
+      }
+
+      unsnapPoint(roadGraph, snapKey);
+      clearAvoidance();
+      avoidedEdgeKeys.add(snapMeta.edgeKey);
+
+      avoidMarker = L.marker(snapLatLng, {
+        icon: L.divIcon({
+          className: "avoid-marker",
+          html: '<div class="avoid-marker-badge" title="Tap to remove avoided road"><svg class="avoid-marker-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 9-6 6m0-6 6 6m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg></div>',
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        }),
+        title: "Tap to remove avoided road",
+        keyboard: false,
+      })
+        .addTo(layers.route)
+        .on("click", () => clearAvoidanceAndReroute());
+
+      endAvoidRoadPickMode();
+      showRoute({ fromReroute: true });
+    };
+
+    map.on("click", avoidPickHandler);
+  }
+
+  function clearRoute(options = {}) {
+    const { preservePanel = false, preserveAvoidMarker = false } = options;
     if (routeAnimId) {
       cancelAnimationFrame(routeAnimId);
       routeAnimId = null;
     }
     layers.route.clearLayers();
     lastEtaInfo = null;
-    hideRoutePanel();
+    if (!preserveAvoidMarker) {
+      clearAvoidance();
+      avoidMarker = null;
+    }
+    if (!preservePanel) hideRoutePanel();
   }
 
   /** Creates the draggable marker for the route's starting point (the subdivision gate). */
@@ -943,9 +1107,14 @@ export function createMapController() {
   }
 
   /** Recomputes and (re)draws the route to the active destination, always using drivable roads. */
-  function showRoute() {
+  function showRoute(options = {}) {
+    const { fromReroute = false } = options;
     if (!activeDest) return;
-    clearRoute();
+    clearRoute({ preservePanel: fromReroute, preserveAvoidMarker: true });
+
+    if (fromReroute && avoidedEdgeKeys.size > 0 && avoidMarker) {
+      avoidMarker.addTo(layers.route);
+    }
 
     const { destCenter, bounds } = activeDest;
     let route = null;
@@ -954,7 +1123,7 @@ export function createMapController() {
       destSnapKey = snapPointToGraph(roadGraph, [destCenter.lng, destCenter.lat], mainRoadComponent);
       if (destSnapKey) {
         connectSnapNodesIfSameSegment(roadGraph, gateNodeKey, destSnapKey);
-        route = findRoute(roadGraph, gateNodeKey, destSnapKey);
+        route = runRouteWithAvoidance(gateNodeKey, destSnapKey);
       }
     }
 
@@ -966,16 +1135,24 @@ export function createMapController() {
       unsnapPoint(roadGraph, destSnapKey);
       const routeBounds = L.latLngBounds(pathLatLngs);
       if (bounds) routeBounds.extend(bounds);
-      map.fitBounds(routeBounds, { maxZoom: 19, padding: [60, 60] });
-      animateRoute(pathLatLngs, route.keys, route.distance, destCenter);
+      if (!fromReroute) {
+        map.fitBounds(routeBounds, { maxZoom: 19, padding: [60, 60] });
+      }
+      animateRoute(pathLatLngs, route.keys, route.distance, destCenter, {
+        animatePanel: !fromReroute,
+      });
     } else {
+      if (fromReroute) {
+        clearAvoidance();
+      }
       unsnapPoint(roadGraph, destSnapKey);
       if (bounds) map.fitBounds(bounds, { maxZoom: 20, padding: [80, 80] });
     }
+    updateRerouteButtonState();
   }
 
   /** Animates a marker along the route, then updates route details in the corner panel. */
-  function animateRoute(pathLatLngs, pathNodeKeys, distanceMeters, destLatLng) {
+  function animateRoute(pathLatLngs, pathNodeKeys, distanceMeters, destLatLng, options = {}) {
     L.polyline(pathLatLngs, {
       className: "route-casing",
       color: "#1a1a1a",
@@ -1019,7 +1196,7 @@ export function createMapController() {
       Math.max(1200, (total / VISUAL_SPEED_MPS) * 1000),
     );
     const start = performance.now();
-    renderRoutePanel(destLatLng, total, pathLatLngs, pathNodeKeys);
+    renderRoutePanel(destLatLng, total, pathLatLngs, pathNodeKeys, options);
 
     function step(now) {
       const t = Math.min((now - start) / duration, 1);
@@ -1048,7 +1225,7 @@ export function createMapController() {
   }
 
   /** Renders the corner route panel with unit details, ETAs, and short turn-by-turn narrative. */
-  function renderRoutePanel(latlng, distanceMeters, pathLatLngs, pathNodeKeys) {
+  function renderRoutePanel(latlng, distanceMeters, pathLatLngs, pathNodeKeys, options = {}) {
     if (!routePanel || !routeUnitEl || !routeMetaEl || !routeEtaRowsEl || !routeNarrativeEl) return;
 
     lastEtaInfo = { latlng, distanceMeters, pathLatLngs, pathNodeKeys };
@@ -1073,15 +1250,25 @@ export function createMapController() {
     routeEtaRowsEl.innerHTML = rows;
 
     routeNarrativeEl.innerHTML = buildNarrative(pathLatLngs, pathNodeKeys, distanceMeters);
-    showRoutePanel();
+    showRoutePanel(options);
   }
 
-  function showRoutePanel() {
+  function showRoutePanel(options = {}) {
+    const { animatePanel = true } = options;
     if (!routePanel) return;
     if (panelHideTimer) {
       clearTimeout(panelHideTimer);
       panelHideTimer = null;
     }
+
+    if (!animatePanel) {
+      routePanel.classList.remove("hidden", "is-hiding");
+      if (!routePanel.classList.contains("is-visible")) {
+        routePanel.classList.add("is-visible");
+      }
+      return;
+    }
+
     routePanel.classList.remove("hidden", "is-hiding", "is-visible");
     // Restart animation when panel updates for a new destination.
     void routePanel.offsetWidth;
@@ -1231,9 +1418,12 @@ export function createMapController() {
 
   /** Fully clears the current selection: highlight, route, and destination state. */
   function clearSelection() {
+    endAvoidRoadPickMode();
     clearHighlight();
     clearRoute();
+    clearAvoidance();
     activeDest = null;
+    updateRerouteButtonState();
   }
 
   function populateBlockSelect(lotsByBlock, cityBlockLayersByKey) {
@@ -1334,6 +1524,8 @@ export function createMapController() {
     const bounds = entry.layer.getBounds ? entry.layer.getBounds() : null;
     const destCenter = bounds ? bounds.getCenter() : null;
     activeDest = destCenter ? { destCenter, bounds } : null;
+    clearAvoidance();
+    updateRerouteButtonState();
 
     if (activeDest) {
       showRoute();
@@ -1344,9 +1536,12 @@ export function createMapController() {
 
   /** Highlights a whole city_block boundary (possibly split across several ways). No route is drawn. */
   function highlightCityBlock(entry) {
+    endAvoidRoadPickMode();
     clearHighlight();
     clearRoute();
     activeDest = null;
+    clearAvoidance();
+    updateRerouteButtonState();
 
     let bounds = null;
     for (const layer of entry.layers) {
@@ -1377,10 +1572,11 @@ export function createMapController() {
     L.marker(topCenter, {
       icon: L.divIcon({
         className: "block-clear-marker",
-        html: '<div class="block-clear-handle">&times;</div>',
+        html: '<div class="block-clear-handle" title="Clear selection">&times;</div>',
         iconSize: [26, 26],
         iconAnchor: [13, 13],
       }),
+      title: "Clear selection",
     })
       .addTo(layers.route)
       .on("click", () => clearSelection());

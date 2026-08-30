@@ -140,6 +140,30 @@ main {
   background: var(--bg);
 }
 
+.reroute-banner {
+  position: absolute;
+  top: 4.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1150;
+  width: min(360px, calc(100vw - 2.5rem));
+  padding: 0.5rem 0.72rem;
+  border-radius: 9px;
+  border: 1px solid #efc28a;
+  background: #fff1dd;
+  color: #6a3f12;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.16);
+  pointer-events: none;
+}
+
+.reroute-banner.hidden {
+  display: none;
+}
+
 /* Leaflet element flat-styling */
 .leaflet-container {
   background: var(--bg);
@@ -280,6 +304,33 @@ main {
 .route-marker-icon {
   width: 14px;
   height: 14px;
+  display: block;
+}
+
+.avoid-marker {
+  background: transparent;
+  border: 0;
+  pointer-events: auto;
+}
+
+.avoid-marker-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #8e1f2f;
+  border: 2px solid #fff;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.avoid-marker-icon {
+  width: 20px;
+  height: 20px;
   display: block;
 }
 
@@ -489,8 +540,28 @@ main {
   font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
-  width: 132px;
+  width: 116px;
   text-align: center;
+}
+
+.route-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.eta-reroute {
+  background: var(--accent);
+  color: #fff;
+}
+
+.eta-reroute:hover {
+  background: #256640;
+}
+
+.eta-reroute:disabled {
+  background: #7ea48f;
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .eta-popup .leaflet-popup-content-wrapper {
@@ -569,6 +640,13 @@ main {
 }
 
 @media (max-width: 720px) {
+  .reroute-banner {
+    top: 3.95rem;
+    width: min(320px, calc(100vw - 2rem));
+    font-size: 0.78rem;
+    padding: 0.46rem 0.64rem;
+  }
+
   .route-panel {
     left: 0;
     right: 0;

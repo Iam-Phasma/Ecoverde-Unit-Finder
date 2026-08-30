@@ -231,3 +231,57 @@ export function findRoute(graph, startKey, endKey) {
   keys.reverse();
   return { keys, distance: dist.get(endKey) };
 }
+
+function removeFirstUndirectedEdge(graph, a, b) {
+  const aEdges = graph.adj.get(a);
+  const bEdges = graph.adj.get(b);
+  if (!aEdges || !bEdges) return null;
+
+  const aIdx = aEdges.findIndex((e) => e.to === b);
+  const bIdx = bEdges.findIndex((e) => e.to === a);
+  if (aIdx === -1 || bIdx === -1) return null;
+
+  const [aEdge] = aEdges.splice(aIdx, 1);
+  const [bEdge] = bEdges.splice(bIdx, 1);
+  return { aEdge, bEdge, aIdx, bIdx };
+}
+
+function restoreFirstUndirectedEdge(graph, a, b, removed) {
+  if (!removed) return;
+  const aEdges = graph.adj.get(a);
+  const bEdges = graph.adj.get(b);
+  if (!aEdges || !bEdges) return;
+  aEdges.splice(Math.min(removed.aIdx, aEdges.length), 0, removed.aEdge);
+  bEdges.splice(Math.min(removed.bIdx, bEdges.length), 0, removed.bEdge);
+}
+
+/**
+ * Finds an alternate route that is different from the best path by forcing one best-path edge
+ * out at a time, then taking the shortest remaining valid candidate.
+ */
+export function findSecondBestRoute(graph, startKey, endKey, bestRoute) {
+  if (!bestRoute || !Array.isArray(bestRoute.keys) || bestRoute.keys.length < 2) {
+    return null;
+  }
+
+  const bestSignature = bestRoute.keys.join(">");
+  let second = null;
+
+  for (let i = 1; i < bestRoute.keys.length; i++) {
+    const a = bestRoute.keys[i - 1];
+    const b = bestRoute.keys[i];
+    const removed = removeFirstUndirectedEdge(graph, a, b);
+    if (!removed) continue;
+
+    const candidate = findRoute(graph, startKey, endKey);
+    restoreFirstUndirectedEdge(graph, a, b, removed);
+
+    if (!candidate) continue;
+    if (candidate.keys.join(">") === bestSignature) continue;
+    if (!second || candidate.distance < second.distance) {
+      second = candidate;
+    }
+  }
+
+  return second;
+}
