@@ -1032,8 +1032,9 @@ export function createMapController() {
   }
 
   function formatTurnIcon(type) {
-    const icon = type === "left" ? "←" : type === "right" ? "→" : "↑";
-    return `<span class="route-turn-icon" aria-hidden="true">${icon}</span>`;
+    const rotation =
+      type === "left" ? "-90" : type === "right" ? "90" : "0";
+    return `<span class="route-turn-icon" aria-hidden="true"><svg class="route-turn-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" style="transform: rotate(${rotation}deg)"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v13m0-13 4 4m-4-4-4 4"/></svg></span>`;
   }
 
   function buildNamedLegs(pathLatLngs, pathNodeKeys) {

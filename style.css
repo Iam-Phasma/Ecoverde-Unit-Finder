@@ -69,6 +69,12 @@ body {
   background: #256640;
 }
 
+.search button:disabled {
+  background: #7ea48f;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .search-separator {
   width: 1px;
   align-self: stretch;
@@ -442,7 +448,13 @@ main {
   line-height: 0.95;
   vertical-align: 0.02em;
   margin-right: 0.28em;
-  text-shadow: 0 0 0.35px #fff, 0 0 0.35px #fff;
+}
+
+.route-turn-icon-svg {
+  width: 1.08em;
+  height: 1.08em;
+  color: #ffffff;
+  transform-origin: 50% 50%;
 }
 
 .route-actions {
