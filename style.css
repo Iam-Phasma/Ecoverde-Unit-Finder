@@ -375,50 +375,6 @@ main {
   font-weight: 700;
 }
 
-.compass-toggle-control {
-  display: none;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.leaflet-bar.compass-toggle-control {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.compass-toggle-control a {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px !important;
-  border: 2px solid #bfb3a0;
-  background: #ffffff;
-  color: #2c2825;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  padding: 0;
-  overflow: hidden;
-}
-
-.leaflet-bar.compass-toggle-control a {
-  border-bottom: 0;
-}
-
-.compass-glyph-svg {
-  width: 16px;
-  height: 16px;
-  display: inline-block;
-  vertical-align: middle;
-}
-
-.compass-toggle-control a.is-active {
-  background: #2f7d4f;
-  color: #fff;
-}
-
 .route-panel {
   position: absolute;
   left: 1rem;
@@ -657,10 +613,6 @@ main {
 
   .recenter-control {
     display: none;
-  }
-
-  .compass-toggle-control {
-    display: block;
   }
 
   .route-actions {
