@@ -611,11 +611,12 @@ main {
 
 @media (max-width: 720px) {
   .search {
-    top: 0.65rem;
+    top: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 0.55rem);
     left: 0.65rem;
     right: 0.65rem;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    display: flex;
+    flex-wrap: nowrap;
     gap: 0.34rem;
     align-items: stretch;
     padding: 0.38rem;
@@ -633,11 +634,22 @@ main {
 
   .search select,
   .search button {
-    width: 100%;
+    width: auto;
     min-width: 0;
     height: 2.45rem;
     font-size: 0.78rem;
     border-radius: 10px;
+  }
+
+  #block-select,
+  #lot-select {
+    flex: 1 1 0;
+  }
+
+  .search > button[type="submit"] {
+    flex: 0 0 auto;
+    padding: 0.5rem 0.8rem;
+    white-space: nowrap;
   }
 
   .search select {
@@ -645,20 +657,20 @@ main {
   }
 
   .layers-menu {
-    position: fixed;
-    right: 0.9rem;
-    bottom: 0.9rem;
+    position: relative;
+    right: auto;
+    bottom: auto;
     width: auto;
-    z-index: 1200;
+    z-index: 1000;
   }
 
   .layers-menu > button {
-    width: 52px;
-    height: 52px;
-    min-width: 52px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
     padding: 0;
     border-radius: 999px;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
   }
 
   .layers-toggle-icon {
@@ -687,7 +699,7 @@ main {
     right: 0;
     margin: 0 auto;
     width: min(390px, calc(100vw - 1.5rem));
-    bottom: 0.75rem;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.25rem);
   }
 
   .recenter-control {
