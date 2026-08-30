@@ -80,9 +80,9 @@ body {
 }
 
 .find-toggle-icon {
-  display: none;
-  width: 20px;
-  height: 20px;
+  display: inline-block;
+  width: 18px;
+  height: 18px;
 }
 
 .find-toggle-label {
@@ -120,9 +120,9 @@ body {
 }
 
 .layers-toggle-icon {
-  display: none;
-  width: 20px;
-  height: 20px;
+  display: inline-block;
+  width: 18px;
+  height: 18px;
 }
 
 .layers-toggle-label {
