@@ -20,7 +20,7 @@ import {
 } from "./style.js";
 import { escapeHtml, numericCompare } from "./utils.js";
 
-const ETA_SPEEDS_KMH = { car: 20, bicycle: 15, walk: 5 };
+const ETA_SPEEDS_KMH = { car: 20, motorcycle: 25, bicycle: 15, walk: 5 };
 const MIN_REPOSITION_ROUTE_KM = 0.01;
 const ROAD_TAP_MAX_SNAP_PX = 16;
 const REROUTE_PICK_BANNER_TEXT = "Tap the road segment you want to avoid.";
@@ -1147,6 +1147,7 @@ export function createMapController() {
 
     const rows = [
       ["🚗", "Car", ETA_SPEEDS_KMH.car],
+      ["🏍️", "Motorcycle", ETA_SPEEDS_KMH.motorcycle],
       ["🚲", "Bicycle", ETA_SPEEDS_KMH.bicycle],
       ["🚶", "Walk", ETA_SPEEDS_KMH.walk],
     ]
