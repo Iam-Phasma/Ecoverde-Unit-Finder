@@ -24,8 +24,10 @@ const ETA_SPEEDS_KMH = { car: 20, bicycle: 15, walk: 5 };
 const MIN_REPOSITION_ROUTE_KM = 0.01;
 const ROAD_TAP_MAX_SNAP_PX = 16;
 const REROUTE_PICK_BANNER_TEXT = "Tap the road segment you want to avoid.";
-const REROUTE_BLOCKED_BANNER_TEXT =
-  "No alternate route from this start point. Tap the X marker to remove avoidance, or move the start point.";
+
+function blockageMarkerIconSvg() {
+  return '<svg class="avoid-marker-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-4.5 9h9"/></svg>';
+}
 
 export function createMapController() {
   const map = L.map("map", {
@@ -791,7 +793,7 @@ export function createMapController() {
         rerouteBanner.textContent = REROUTE_PICK_BANNER_TEXT;
         rerouteBanner.classList.remove("hidden");
       } else if (rerouteBlocked) {
-        rerouteBanner.textContent = REROUTE_BLOCKED_BANNER_TEXT;
+        rerouteBanner.innerHTML = `No alternate route from this start point. Tap the <span class="reroute-banner-icon" aria-hidden="true">${blockageMarkerIconSvg()}</span> marker to remove avoidance, or move the start point.`;
         rerouteBanner.classList.remove("hidden");
       } else {
         rerouteBanner.textContent = REROUTE_PICK_BANNER_TEXT;
@@ -916,7 +918,7 @@ export function createMapController() {
       avoidMarker = L.marker(snapLatLng, {
         icon: L.divIcon({
           className: "avoid-marker",
-          html: '<div class="avoid-marker-badge" title="Tap to remove avoided road"><svg class="avoid-marker-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 9-6 6m0-6 6 6m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg></div>',
+          html: `<div class="avoid-marker-badge" title="Tap to remove avoided road">${blockageMarkerIconSvg()}</div>`,
           iconSize: [26, 26],
           iconAnchor: [13, 13],
         }),

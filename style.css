@@ -175,21 +175,34 @@ main {
   transform: translateX(-50%);
   z-index: 1150;
   width: min(360px, calc(100vw - 2.5rem));
-  padding: 0.5rem 0.72rem;
-  border-radius: 9px;
-  border: 1px solid #efc28a;
-  background: #fff1dd;
-  color: #6a3f12;
+  padding: 0.54rem 0.78rem;
+  border-radius: 10px;
+  border: 2px solid #ffffff;
+  background: #1d7450;
+  color: #ffffff;
   text-align: center;
   font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.16);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  box-shadow: 0 0 0 3px #2f7d4f, 0 8px 16px rgba(0, 0, 0, 0.18);
   pointer-events: none;
 }
 
 .reroute-banner.hidden {
   display: none;
+}
+
+.reroute-banner-icon {
+  display: inline-flex;
+  vertical-align: -0.15em;
+  margin: 0 0.2em;
+  color: #ffffff;
+}
+
+.reroute-banner-icon svg {
+  width: 1em;
+  height: 1em;
+  display: block;
 }
 
 /* Leaflet element flat-styling */
@@ -729,11 +742,21 @@ main {
   }
 
   .route-panel {
-    left: 0;
-    right: 0;
-    margin: 0 auto;
+    left: 50%;
+    right: auto;
+    top: 50%;
+    bottom: auto;
+    margin: 0;
     width: min(390px, calc(100vw - 1.5rem));
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.25rem);
+    transform: translate(-50%, -50%);
+  }
+
+  .route-panel.is-visible {
+    animation: route-panel-mobile-in 150ms ease-out both;
+  }
+
+  .route-panel.is-hiding {
+    animation: route-panel-mobile-out 130ms ease-in both;
   }
 
   .recenter-control {
@@ -764,6 +787,28 @@ main {
   }
   to {
     transform: translateX(calc(-100% - 1.2rem));
+  }
+}
+
+@keyframes route-panel-mobile-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes route-panel-mobile-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -46%);
   }
 }
 
