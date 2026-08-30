@@ -289,11 +289,21 @@ export function createMapController() {
     if (!Array.isArray(features)) return;
     const bestByType = new Map();
     const modelUnitPins = [];
+    const realEstatePins = [];
+    const gazeboPins = [];
     for (const feature of features) {
       const pin = pinMetaForFeature(feature);
       if (!pin) continue;
       if (pin.type === "modelUnit") {
         modelUnitPins.push({ feature, pin });
+        continue;
+      }
+      if (pin.type === "realEstate") {
+        realEstatePins.push({ feature, pin });
+        continue;
+      }
+      if (pin.type === "gazebo") {
+        gazeboPins.push({ feature, pin });
         continue;
       }
       const existing = bestByType.get(pin.type);
@@ -313,6 +323,18 @@ export function createMapController() {
       if (!latlng) continue;
       layers.administrative.addLayer(createAdministrativePin(latlng, pin));
     }
+
+    for (const { feature, pin } of realEstatePins) {
+      const latlng = featureCenterLatLng(feature);
+      if (!latlng) continue;
+      layers.administrative.addLayer(createAdministrativePin(latlng, pin));
+    }
+
+    for (const { feature, pin } of gazeboPins) {
+      const latlng = featureCenterLatLng(feature);
+      if (!latlng) continue;
+      layers.administrative.addLayer(createAdministrativePin(latlng, pin));
+    }
   }
 
   function pinMetaForFeature(feature) {
@@ -325,7 +347,7 @@ export function createMapController() {
       return { type: "basketball", icon: "🏀", label: "Basketball Court", score: 1 };
     }
     if (props.man_made === "water_tower") {
-      return { type: "waterTower", icon: "🗼", label: "Water Tower", score: 1 };
+      return { type: "waterTower", icon: "💧", label: "Water Tower", score: 1 };
     }
     if (amenity === "toilets") {
       return { type: "restroom", icon: "🚻", label: "Restroom", score: 1 };
@@ -338,11 +360,12 @@ export function createMapController() {
     }
     if (
       office.toLowerCase().includes("estate_agent") ||
+      office.toLowerCase().includes("estate") ||
       name.toLowerCase().includes("real estate") ||
       name.toLowerCase().includes("admin building")
     ) {
       const score = props.category === "poi-office" ? 3 : 2;
-      return { type: "realEstate", icon: "🏢", label: "Real Estate Office", score };
+      return { type: "realEstate", icon: "🏢", label: "Real State Office", score };
     }
     if (name.toLowerCase().includes("model unit")) {
       return {
@@ -352,7 +375,10 @@ export function createMapController() {
         score: 2,
       };
     }
-    if (props.building === "pavilion" || props.building === "gazebo") {
+    if (props.building === "gazebo") {
+      return { type: "gazebo", icon: "🛖", label: "Gazebo", score: 2 };
+    }
+    if (props.building === "pavilion") {
       const score = name.toLowerCase().includes("club house") ? 3 : 1;
       return { type: "pavilion", icon: "🏛️", label: "Pavilion", score };
     }
