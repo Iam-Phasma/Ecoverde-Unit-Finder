@@ -3,6 +3,7 @@
 import { WALK_HIGHWAYS } from "./graph.js";
 
 export function groupForCategory(category) {
+  if (category === "context-road") return "contextRoads";
   if (category === "road") return "roads";
   if (category === "landuse") return "landuse";
   if (category === "leisure") return "leisure";
@@ -23,6 +24,15 @@ function roadWeight(props) {
 export function roadCasingStyle(props) {
   const hw = props.highway;
   if (WALK_HIGHWAYS.has(hw)) return null;
+  if (hw === "primary") {
+    return {
+      color: "#666b70",
+      weight: 11.5,
+      opacity: 1,
+      lineCap: "round",
+      lineJoin: "round",
+    };
+  }
   const fillWeight =
     hw === "service" || hw === "track" ? 3.5 : roadWeight(props);
   return {
@@ -57,6 +67,16 @@ function roadStyle(props) {
     };
   }
 
+  if (hw === "primary") {
+    return {
+      color: "#d2d6da",
+      weight: 8,
+      opacity: 1,
+      lineCap: "round",
+      lineJoin: "round",
+    };
+  }
+
   // car roads (residential, unclassified, etc.)
   return {
     color: "#ffffff",
@@ -64,6 +84,41 @@ function roadStyle(props) {
     opacity: 1,
     lineCap: "round",
     lineJoin: "round",
+  };
+}
+
+export function roadCenterlineStyle(props) {
+  if (props.highway !== "primary") return null;
+  return {
+    color: "#f2cb3d",
+    weight: 2.2,
+    opacity: 1,
+    dashArray: "10,10",
+    lineCap: "round",
+    lineJoin: "round",
+  };
+}
+
+export function contextRoadCasingStyle() {
+  return {
+    color: "#60656c",
+    weight: 9,
+    opacity: 1,
+    lineCap: "round",
+    lineJoin: "round",
+    interactive: false,
+  };
+}
+
+export function contextRoadCenterlineStyle() {
+  return {
+    color: "#f2cb3d",
+    weight: 2,
+    opacity: 0.95,
+    dashArray: "11,10",
+    lineCap: "round",
+    lineJoin: "round",
+    interactive: false,
   };
 }
 
@@ -105,6 +160,17 @@ export function styleForFeature(feature) {
         fillOpacity: 0.9,
       };
     case "leisure":
+      if (
+        feature.properties.sport === "basketball" ||
+        feature.properties.surface === "concrete"
+      ) {
+        return {
+          color: "#a8a39a",
+          weight: 1,
+          fillColor: "#c9c5bc",
+          fillOpacity: 0.95,
+        };
+      }
       return {
         color: "#9fc98f",
         weight: 1,
@@ -134,10 +200,11 @@ export function styleForFeature(feature) {
       };
     case "context-road":
       return {
-        color: "#e8b93b",
-        weight: 4,
-        opacity: 0.55,
+        color: "#60656c",
+        weight: 6,
+        opacity: 1,
         lineCap: "round",
+        lineJoin: "round",
         interactive: false,
       };
     case "context-water":
@@ -151,11 +218,11 @@ export function styleForFeature(feature) {
       };
     case "poi-tree":
       return {
-        color: "#6fad66",
-        weight: 1.2,
-        opacity: 0.95,
-        fillColor: "#87c97d",
-        fillOpacity: 0.68,
+        color: "#b7cf63",
+        weight: 0,
+        opacity: 1,
+        fillColor: "#b7cf63",
+        fillOpacity: 0.58,
       };
     case "poi-shop":
     case "poi-amenity":
@@ -189,15 +256,25 @@ export function pointToLayer(feature, latlng) {
   const color = colors[feature.properties.category] || "#555";
   // Keep only actual OSM tree points visible. Hide other POI point markers.
   if (feature.properties && feature.properties.category === "poi-tree") {
-    return L.circleMarker(latlng, {
+    const outer = L.circleMarker(latlng, {
       radius: 8,
-      color: "#6fad66",
-      weight: 1.2,
-      opacity: 0.95,
-      fillColor: "#87c97d",
-      fillOpacity: 0.68,
+      color: "#b7cf63",
+      weight: 0,
+      opacity: 1,
+      fillColor: "#b7cf63",
+      fillOpacity: 0.58,
       interactive: false,
     });
+    const core = L.marker(latlng, {
+      icon: L.divIcon({
+        className: "tree-center-dot",
+        iconSize: [4, 4],
+        iconAnchor: [2, 2],
+      }),
+      interactive: false,
+      keyboard: false,
+    });
+    return L.featureGroup([outer, core]);
   }
 
   if (feature.properties && typeof feature.properties.category === "string" && feature.properties.category.startsWith("poi-")) {

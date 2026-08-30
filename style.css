@@ -148,6 +148,13 @@ main {
   stroke-linecap: round;
 }
 
+.tree-center-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #8daa45;
+}
+
 .road-name-label {
   pointer-events: none;
 }

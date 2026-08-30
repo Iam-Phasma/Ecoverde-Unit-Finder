@@ -9,9 +9,12 @@ import {
   unsnapPoint,
 } from "./graph.js";
 import {
+  contextRoadCasingStyle,
+  contextRoadCenterlineStyle,
   groupForCategory,
   pointToLayer,
   roadCasingStyle,
+  roadCenterlineStyle,
   styleForFeature,
 } from "./style.js";
 import { escapeHtml, numericCompare } from "./utils.js";
@@ -80,6 +83,10 @@ export function createMapController() {
     cityBlocks: L.layerGroup().addTo(map),
     roadsCasing: L.layerGroup().addTo(map),
     roads: L.layerGroup().addTo(map),
+    roadsCenter: L.layerGroup().addTo(map),
+    contextRoadsCasing: L.layerGroup().addTo(map),
+    contextRoads: L.layerGroup().addTo(map),
+    contextRoadsCenter: L.layerGroup().addTo(map),
     buildings: L.layerGroup().addTo(map),
     barriers: L.layerGroup().addTo(map),
     pois: L.layerGroup().addTo(map),
@@ -162,10 +169,24 @@ export function createMapController() {
               L.polyline(layer.getLatLngs(), casingStyle),
             );
           }
+          const centerlineStyle = roadCenterlineStyle(props);
+          if (centerlineStyle) {
+            layers.roadsCenter.addLayer(
+              L.polyline(layer.getLatLngs(), centerlineStyle),
+            );
+          }
           if (props.name) {
             const candidate = createRoadNameCandidate(layer, props.name);
             if (candidate) roadNameCandidates.push(candidate);
           }
+        }
+        if (props.category === "context-road") {
+          layers.contextRoadsCasing.addLayer(
+            L.polyline(layer.getLatLngs(), contextRoadCasingStyle()),
+          );
+          layers.contextRoadsCenter.addLayer(
+            L.polyline(layer.getLatLngs(), contextRoadCenterlineStyle()),
+          );
         }
       },
     });
@@ -176,7 +197,12 @@ export function createMapController() {
       const category = layer.feature.properties.category;
       const group = layers[groupForCategory(category)] || layers.buildings;
       group.addLayer(layer);
-      if (category === "leisure") addLeisureTextureDots(layer);
+      if (category === "leisure") {
+        const props = layer.feature?.properties || {};
+        if (!(props.sport === "basketball" || props.surface === "concrete")) {
+          addLeisureTextureDots(layer);
+        }
+      }
 
       if (!category.startsWith("context-")) {
         const layerBounds = layer.getBounds
@@ -216,7 +242,7 @@ export function createMapController() {
     const minLon = Math.min(...lons);
     const maxLon = Math.max(...lons);
 
-    const spacingMeters = 8;
+    const spacingMeters = 6;
     const meanLat = (minLat + maxLat) / 2;
     const metersPerDegLat = 111320;
     const metersPerDegLon = Math.max(
@@ -228,7 +254,7 @@ export function createMapController() {
 
     const polygon = ring.map((p) => [p.lat, p.lng]);
     let count = 0;
-    const maxDots = 800;
+    const maxDots = 1400;
 
     for (let lat = minLat + dLat * 0.5; lat <= maxLat; lat += dLat) {
       for (let lon = minLon + dLon * 0.5; lon <= maxLon; lon += dLon) {
@@ -236,11 +262,11 @@ export function createMapController() {
         if (!pointInPolygon([lat, lon], polygon)) continue;
         layers.leisureDots.addLayer(
           L.circleMarker([lat, lon], {
-            radius: 1.1,
-            color: "#9ec58f",
+            radius: 1.25,
+            color: "#7faa73",
             weight: 0,
-            fillColor: "#8fbc80",
-            fillOpacity: 0.75,
+            fillColor: "#7faa73",
+            fillOpacity: 0.92,
             interactive: false,
           }),
         );
