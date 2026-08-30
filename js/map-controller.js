@@ -23,6 +23,9 @@ import { escapeHtml, numericCompare } from "./utils.js";
 const ETA_SPEEDS_KMH = { car: 20, bicycle: 15, walk: 5 };
 const MIN_REPOSITION_ROUTE_KM = 0.01;
 const ROAD_TAP_MAX_SNAP_PX = 16;
+const REROUTE_PICK_BANNER_TEXT = "Tap the road segment you want to avoid.";
+const REROUTE_BLOCKED_BANNER_TEXT =
+  "No alternate route from this start point. Tap the X marker to remove avoidance, or move the start point.";
 
 export function createMapController() {
   const map = L.map("map", {
@@ -129,6 +132,7 @@ export function createMapController() {
   let activeDest = null; // { destCenter, bounds } for the currently highlighted building
   let lastEtaInfo = null; // { latlng, distanceMeters, pathLatLngs } for reopening route details
   let avoidMode = false;
+  let rerouteBlocked = false;
   let avoidMarker = null;
   let avoidedEdgeKeys = new Set();
   let avoidPickHandler = null;
@@ -765,21 +769,37 @@ export function createMapController() {
   function updateRerouteButtonState() {
     if (!routeRerouteBtn) return;
     routeRerouteBtn.disabled = !activeDest;
-    routeRerouteBtn.textContent = avoidMode ? "Cancel" : "Re-route";
+    routeRerouteBtn.textContent = avoidMode
+      ? "Cancel"
+      : rerouteBlocked
+        ? "Pick another"
+        : "Re-route";
     routeRerouteBtn.title = avoidMode
       ? "Cancel road selection"
-      : "Pick a road point to avoid and recalculate route";
+      : rerouteBlocked
+        ? "Pick another road to avoid"
+        : "Pick a road point to avoid and recalculate route";
 
     if (routeClearBtn) routeClearBtn.disabled = avoidMode;
     if (routeDismissBtn) routeDismissBtn.disabled = avoidMode;
 
     if (rerouteBanner) {
-      rerouteBanner.classList.toggle("hidden", !avoidMode);
+      if (avoidMode) {
+        rerouteBanner.textContent = REROUTE_PICK_BANNER_TEXT;
+        rerouteBanner.classList.remove("hidden");
+      } else if (rerouteBlocked) {
+        rerouteBanner.textContent = REROUTE_BLOCKED_BANNER_TEXT;
+        rerouteBanner.classList.remove("hidden");
+      } else {
+        rerouteBanner.textContent = REROUTE_PICK_BANNER_TEXT;
+        rerouteBanner.classList.add("hidden");
+      }
     }
   }
 
   function clearAvoidance() {
     avoidedEdgeKeys.clear();
+    rerouteBlocked = false;
     if (avoidMarker) {
       layers.route.removeLayer(avoidMarker);
       avoidMarker = null;
@@ -848,6 +868,7 @@ export function createMapController() {
 
   function beginAvoidRoadPick() {
     if (!activeDest || !roadGraph || !gateNodeKey || avoidMode) return;
+    rerouteBlocked = false;
     avoidMode = true;
     updateRerouteButtonState();
     if (isPhoneViewport.matches) {
@@ -1003,6 +1024,7 @@ export function createMapController() {
     }
 
     if (route) {
+      rerouteBlocked = false;
       const pathLatLngs = route.keys.map((k) => {
         const [lon, lat] = roadGraph.nodes.get(k);
         return L.latLng(lat, lon);
@@ -1018,7 +1040,8 @@ export function createMapController() {
       });
     } else {
       if (fromReroute) {
-        clearAvoidance();
+        rerouteBlocked = true;
+        hideRoutePanel();
       }
       unsnapPoint(roadGraph, destSnapKey);
       if (bounds) map.fitBounds(bounds, { maxZoom: 20, padding: [80, 80] });
