@@ -1,6 +1,6 @@
 # Ecoverde-Unit-Finder
 
-A flat, top-down, solid-UI map of the **Ecoverde Homes** subdivision (Rosario, Batangas, Philippines) with a house **block/lot search**. Built with plain HTML/CSS/JS + [Leaflet](https://leafletjs.com/), sourced from OpenStreetMap data.
+A low-poly map of the **Ecoverde Homes** subdivision in Quilib, Rosario, Batangas with a house **block/lot search**.
 
 ## How it works
 
@@ -41,10 +41,6 @@ result to `data/ecoverde-raw.json`, then rebuild:
 ```powershell
 node tools/build-geojson.js
 ```
-
-## Deploying
-
-This is a static site — push to GitHub and enable GitHub Pages (serve from the repo root / `main` branch).
 
 ## Data source & license
 
