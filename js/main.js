@@ -1,6 +1,20 @@
 // Bootstraps the map and wires up the search form + layers menu UI.
 import { createMapController } from "./map-controller.js";
 
+if ("serviceWorker" in navigator) {
+  const registerServiceWorker = () => {
+    navigator.serviceWorker
+      .register("sw.js")
+      .catch((err) => console.warn("Service worker registration failed", err));
+  };
+
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(registerServiceWorker, { timeout: 2000 });
+  } else {
+    window.addEventListener("load", registerServiceWorker, { once: true });
+  }
+}
+
 const controller = createMapController();
 controller.loadData("data/ecoverde.geojson");
 
