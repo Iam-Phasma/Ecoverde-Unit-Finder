@@ -665,11 +665,11 @@ main {
   }
 
   .layers-menu > button {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
+    width: 2.45rem;
+    height: 2.45rem;
+    min-width: 2.45rem;
     padding: 0;
-    border-radius: 999px;
+    border-radius: 10px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
   }
 
