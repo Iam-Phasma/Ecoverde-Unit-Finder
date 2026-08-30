@@ -1,18 +1,16 @@
 # Ecoverde-Unit-Finder
 
-A low-poly map of the **Ecoverde Homes** subdivision in Quilib, Rosario, Batangas with a house **block/lot search**.
+A clean, low-poly interactive map of **Ecoverde Homes** (Quilib, Rosario, Batangas) focused on fast **block/lot unit finding** and practical in-subdivision routing.
 
-## How it works
+## What you can do
 
-- `data/ecoverde-raw.json` — raw Overpass API export for the subdivision (buildings, roads, landuse, POIs).
-- `data/barriers-raw.json` — raw Overpass API export (bbox query) for perimeter walls/fences; fetched separately because the area-based query above misses ways sitting exactly on the neighbourhood boundary edge.
-- `tools/build-geojson.js` — converts the raw OSM exports into `data/ecoverde.geojson`, parsing each house's `name` tag (e.g. `"B18 L16"`) into `block`/`lot` fields used by search.
-- `index.html` / `style.css` / `js/` — the map UI. Renders roads, buildings, parks/landuse, the perimeter wall/fence and POIs as flat colored shapes (no photo tiles), and lets you search by block & lot to highlight and zoom to a unit.
-  - `js/graph.js` — road graph building and Dijkstra routing (pure logic, no DOM).
-  - `js/style.js` — Leaflet styling per feature category.
-  - `js/map-controller.js` — the map, layers, gate marker, routing, and highlight/popup behavior.
-  - `js/main.js` — entry point; wires up the search form and layers menu.
-  - `js/utils.js` — small string/DOM helpers.
+- Search homes by **Block** and **Lot**.
+- Highlight the selected unit and focus the map on it.
+- Show route distance and estimated travel times for car, bicycle, and walking.
+- Drag the start point to simulate a different origin.
+- Re-route by marking a road segment to avoid, then tap the marker again to remove that avoidance.
+- Use optional overlays like road names, obstacles, and administrative points.
+- Get clearer map labels and controls with built-in button tooltips.
 
 ## Running locally
 
