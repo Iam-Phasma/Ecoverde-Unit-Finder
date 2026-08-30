@@ -20,38 +20,63 @@ const ETA_SPEEDS_KMH = { car: 20, bicycle: 15, walk: 5 };
 
 export function createMapController() {
   const map = L.map("map", {
-    zoomControl: true,
+    zoomControl: false,
     attributionControl: false,
     minZoom: 15,
     maxZoom: 22,
   });
 
-  const recenterControl = L.control({ position: "topleft" });
-  recenterControl.onAdd = function () {
+  const navControl = L.control({ position: "bottomright" });
+  navControl.onAdd = function () {
     const container = L.DomUtil.create(
       "div",
       "leaflet-bar leaflet-control recenter-control",
     );
-    const link = L.DomUtil.create("a", "", container);
-    link.href = "#";
-    link.title = "Center map";
-    link.setAttribute("role", "button");
-    link.setAttribute("aria-label", "Center map");
-    link.innerHTML = "⊙";
+
+    const zoomIn = L.DomUtil.create("a", "", container);
+    zoomIn.href = "#";
+    zoomIn.title = "Zoom in";
+    zoomIn.setAttribute("role", "button");
+    zoomIn.setAttribute("aria-label", "Zoom in");
+    zoomIn.innerHTML = "+";
+
+    const center = L.DomUtil.create("a", "", container);
+    center.href = "#";
+    center.title = "Center map";
+    center.setAttribute("role", "button");
+    center.setAttribute("aria-label", "Center map");
+    center.innerHTML = "⊙";
+
+    const zoomOut = L.DomUtil.create("a", "", container);
+    zoomOut.href = "#";
+    zoomOut.title = "Zoom out";
+    zoomOut.setAttribute("role", "button");
+    zoomOut.setAttribute("aria-label", "Zoom out");
+    zoomOut.innerHTML = "−";
+
     L.DomEvent.disableClickPropagation(container);
-    L.DomEvent.on(link, "click", (e) => {
+    L.DomEvent.on(zoomIn, "click", (e) => {
+      L.DomEvent.preventDefault(e);
+      map.zoomIn();
+    });
+    L.DomEvent.on(center, "click", (e) => {
       L.DomEvent.preventDefault(e);
       recenterMap();
     });
+    L.DomEvent.on(zoomOut, "click", (e) => {
+      L.DomEvent.preventDefault(e);
+      map.zoomOut();
+    });
     return container;
   };
-  recenterControl.addTo(map);
+  navControl.addTo(map);
 
   const layers = {
     context: L.layerGroup().addTo(map),
     landuse: L.layerGroup().addTo(map),
     leisure: L.layerGroup().addTo(map),
     leisureDots: L.layerGroup().addTo(map),
+    roadNames: L.layerGroup().addTo(map),
     cityBlocks: L.layerGroup().addTo(map),
     roadsCasing: L.layerGroup().addTo(map),
     roads: L.layerGroup().addTo(map),
@@ -66,19 +91,33 @@ export function createMapController() {
   const cityBlockLayersByKey = new Map(); // block key (e.g. "18", "14A") -> { layers: [...], props }
   const blockSelect = document.getElementById("block-select");
   const lotSelect = document.getElementById("lot-select");
+  const routePanel = document.getElementById("route-panel");
+  const routeUnitEl = document.getElementById("route-unit");
+  const routeMetaEl = document.getElementById("route-meta");
+  const routeEtaRowsEl = document.getElementById("route-eta-rows");
+  const routeNarrativeEl = document.getElementById("route-narrative");
+  const routeDismissBtn = document.getElementById("route-dismiss");
+  const routeClearBtn = document.getElementById("route-clear");
 
   let highlighted = null;
   let dataBounds = null;
 
   // road-network graph used to animate a route from the subdivision gate to a house
   let roadGraph = null; // drivable roads only, footways/paths excluded
+  let roadNameByEdge = new Map(); // undirected edge "a|b" -> road name
+  let roadNameCandidates = []; // [{ name, latlng }]
   let mainRoadComponent = null;
   let gateNodeKey = null;
   let gateMarker = null; // draggable marker letting the user relocate the route's starting point
   let gateMoved = false; // true once the user drags the gate marker away from its default position
   let routeAnimId = null;
   let activeDest = null; // { destCenter, bounds } for the currently highlighted building
-  let lastEtaInfo = null; // { latlng, distanceMeters } for reopening the popup on click
+  let lastEtaInfo = null; // { latlng, distanceMeters, pathLatLngs } for reopening route details
+  let panelHideTimer = null;
+
+  routeDismissBtn?.addEventListener("click", () => hideRoutePanel());
+  routeClearBtn?.addEventListener("click", () => clearSelection());
+  map.on("zoomend", refreshRoadNameLabels);
 
   function loadData(url) {
     fetch(url)
@@ -89,6 +128,9 @@ export function createMapController() {
 
   function renderData(collection) {
     layers.leisureDots.clearLayers();
+    layers.roadNames.clearLayers();
+    roadNameByEdge = new Map();
+    roadNameCandidates = [];
     const lotsByBlock = new Map(); // block -> Set(lot)
 
     const geoJsonLayer = L.geoJSON(collection, {
@@ -113,11 +155,16 @@ export function createMapController() {
           cityBlockLayersByKey.get(props.block).layers.push(layer);
         }
         if (props.category === "road") {
+          indexRoadEdgeNames(feature);
           const casingStyle = roadCasingStyle(props);
           if (casingStyle) {
             layers.roadsCasing.addLayer(
               L.polyline(layer.getLatLngs(), casingStyle),
             );
+          }
+          if (props.name) {
+            const candidate = createRoadNameCandidate(layer, props.name);
+            if (candidate) roadNameCandidates.push(candidate);
           }
         }
       },
@@ -155,6 +202,7 @@ export function createMapController() {
     map.setMaxBounds(dataBounds.pad(0.5));
     updateMinZoom();
     window.addEventListener("resize", updateMinZoom);
+    refreshRoadNameLabels();
   }
 
   function addLeisureTextureDots(layer) {
@@ -236,6 +284,102 @@ export function createMapController() {
     return inside;
   }
 
+  function createRoadNameCandidate(roadLayer, name) {
+    const latlngs = roadLayer.getLatLngs ? roadLayer.getLatLngs() : null;
+    if (!Array.isArray(latlngs) || latlngs.length === 0) return null;
+
+    const flat = Array.isArray(latlngs[0]) ? latlngs.flat() : latlngs;
+    if (!flat.length) return null;
+    const mid = flat[Math.floor(flat.length / 2)];
+    if (!mid) return null;
+
+    return { name, latlng: mid };
+  }
+
+  function createRoadNameLabel(latlng, name) {
+    return L.marker(latlng, {
+      icon: L.divIcon({
+        className: "road-name-label",
+        html: `<span class="road-name-text">${escapeHtml(name)}</span>`,
+      }),
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: -100,
+    });
+  }
+
+  function refreshRoadNameLabels() {
+    layers.roadNames.clearLayers();
+    if (!map.hasLayer(layers.roadNames) || roadNameCandidates.length === 0) return;
+
+    const thresholdMeters = pixelsToMeters(mergePixelsForZoom(map.getZoom()));
+    const byName = new Map();
+    for (const candidate of roadNameCandidates) {
+      if (!byName.has(candidate.name)) byName.set(candidate.name, []);
+      byName.get(candidate.name).push(candidate.latlng);
+    }
+
+    for (const [name, points] of byName) {
+      const kept = [];
+      for (const point of points) {
+        const tooClose = kept.some((k) => k.distanceTo(point) < thresholdMeters);
+        if (tooClose) continue;
+        kept.push(point);
+        layers.roadNames.addLayer(createRoadNameLabel(point, name));
+      }
+    }
+  }
+
+  function mergePixelsForZoom(zoom) {
+    if (zoom <= 16) return 170;
+    if (zoom === 17) return 130;
+    if (zoom === 18) return 95;
+    return 64;
+  }
+
+  function pixelsToMeters(px) {
+    const center = map.getCenter();
+    const centerPt = map.latLngToContainerPoint(center);
+    const shifted = L.point(centerPt.x + px, centerPt.y);
+    const shiftedLatLng = map.containerPointToLatLng(shifted);
+    return center.distanceTo(shiftedLatLng);
+  }
+
+  function indexRoadEdgeNames(feature) {
+    const props = feature.properties || {};
+    const roadName = props.name;
+    if (!roadName || !feature.geometry || feature.geometry.type !== "LineString") return;
+    const coords = feature.geometry.coordinates;
+    for (let i = 0; i < coords.length - 1; i++) {
+      const a = coordGraphKey(coords[i]);
+      const b = coordGraphKey(coords[i + 1]);
+      roadNameByEdge.set(edgeNameKey(a, b), roadName);
+    }
+  }
+
+  function coordGraphKey(coord) {
+    return `${coord[0].toFixed(6)},${coord[1].toFixed(6)}`;
+  }
+
+  function edgeNameKey(a, b) {
+    return a < b ? `${a}|${b}` : `${b}|${a}`;
+  }
+
+  function setLayerVisibility(key, visible) {
+    const mapping = {
+      roadNames: layers.roadNames,
+    };
+    const layerGroup = mapping[key];
+    if (!layerGroup) return;
+
+    if (visible) {
+      if (!map.hasLayer(layerGroup)) layerGroup.addTo(map);
+      if (key === "roadNames") refreshRoadNameLabels();
+    } else if (map.hasLayer(layerGroup)) {
+      map.removeLayer(layerGroup);
+    }
+  }
+
   /** Locks zooming out past the point where the whole subdivision already fits on screen. */
   function updateMinZoom() {
     if (!dataBounds) return;
@@ -266,8 +410,8 @@ export function createMapController() {
       routeAnimId = null;
     }
     layers.route.clearLayers();
-    map.closePopup();
     lastEtaInfo = null;
+    hideRoutePanel();
   }
 
   /** Creates the draggable marker for the route's starting point (the subdivision gate). */
@@ -326,15 +470,15 @@ export function createMapController() {
       const routeBounds = L.latLngBounds(pathLatLngs);
       if (bounds) routeBounds.extend(bounds);
       map.fitBounds(routeBounds, { maxZoom: 19, padding: [60, 60] });
-      animateRoute(pathLatLngs, route.distance, destCenter);
+      animateRoute(pathLatLngs, route.keys, route.distance, destCenter);
     } else {
       unsnapPoint(roadGraph, destSnapKey);
       if (bounds) map.fitBounds(bounds, { maxZoom: 20, padding: [80, 80] });
     }
   }
 
-  /** Animates a marker along the route, then opens an ETA popup at the house. */
-  function animateRoute(pathLatLngs, distanceMeters, destLatLng) {
+  /** Animates a marker along the route, then updates route details in the corner panel. */
+  function animateRoute(pathLatLngs, pathNodeKeys, distanceMeters, destLatLng) {
     L.polyline(pathLatLngs, {
       className: "route-casing",
       color: "#1a1a1a",
@@ -377,7 +521,7 @@ export function createMapController() {
       Math.max(1200, (total / VISUAL_SPEED_MPS) * 1000),
     );
     const start = performance.now();
-    showEtaPopup(destLatLng, total);
+    renderRoutePanel(destLatLng, total, pathLatLngs, pathNodeKeys);
 
     function step(now) {
       const t = Math.min((now - start) / duration, 1);
@@ -405,10 +549,18 @@ export function createMapController() {
     routeAnimId = requestAnimationFrame(step);
   }
 
-  /** Renders the ETA popup with estimated Car/Bicycle/Walk times for the drawn route. */
-  function showEtaPopup(latlng, distanceMeters) {
-    lastEtaInfo = { latlng, distanceMeters };
+  /** Renders the corner route panel with unit details, ETAs, and short turn-by-turn narrative. */
+  function renderRoutePanel(latlng, distanceMeters, pathLatLngs, pathNodeKeys) {
+    if (!routePanel || !routeUnitEl || !routeMetaEl || !routeEtaRowsEl || !routeNarrativeEl) return;
+
+    lastEtaInfo = { latlng, distanceMeters, pathLatLngs, pathNodeKeys };
     const distanceKm = distanceMeters / 1000;
+
+    const block = highlighted?.props?.block || "-";
+    const lot = highlighted?.props?.lot || "-";
+    routeUnitEl.textContent = `Block ${block}, Lot ${lot}`;
+    routeMetaEl.textContent = `ETA from the ${gateMoved ? "start point" : "gate"} · ${distanceKm.toFixed(2)} km`;
+
     const rows = [
       ["🚗", "Car", ETA_SPEEDS_KMH.car],
       ["🚲", "Bicycle", ETA_SPEEDS_KMH.bicycle],
@@ -417,30 +569,165 @@ export function createMapController() {
       .map(([icon, label, speed]) => {
         const minutes = (distanceKm / speed) * 60;
         const text = minutes < 1 ? "< 1 min" : `${Math.round(minutes)} min`;
-        return `<div class="eta-row"><span>${icon} ${label}</span><strong>${text}</strong></div>`;
+        return `<div class="route-eta-row"><span>${icon} ${label}</span><strong>${text}</strong></div>`;
       })
       .join("");
+    routeEtaRowsEl.innerHTML = rows;
 
-    const popup = L.popup({
-      className: "eta-popup",
-      closeButton: false,
-      offset: [0, -28],
-    })
-      .setLatLng(latlng)
-      .setContent(
-        `<div class="eta-title">ETA from the ${gateMoved ? "start point" : "gate"} &middot; ${distanceKm.toFixed(2)} km</div>${rows}` +
-        `<div class="eta-actions">` +
-          `<button type="button" class="eta-clear" aria-label="Clear route">Clear route</button>` +
-          `<button type="button" class="eta-dismiss" aria-label="Dismiss">Dismiss</button>` +
-        `</div>`,
-      )
-      .openOn(map);
+    routeNarrativeEl.innerHTML = buildNarrative(pathLatLngs, pathNodeKeys, distanceMeters);
+    showRoutePanel();
+  }
 
-    const popupEl = popup.getElement();
-    if (popupEl) {
-      popupEl.querySelector(".eta-dismiss")?.addEventListener("click", () => map.closePopup());
-      popupEl.querySelector(".eta-clear")?.addEventListener("click", () => clearSelection());
+  function showRoutePanel() {
+    if (!routePanel) return;
+    if (panelHideTimer) {
+      clearTimeout(panelHideTimer);
+      panelHideTimer = null;
     }
+    routePanel.classList.remove("hidden", "is-hiding", "is-visible");
+    // Restart animation when panel updates for a new destination.
+    void routePanel.offsetWidth;
+    routePanel.classList.add("is-visible");
+  }
+
+  function hideRoutePanel() {
+    if (!routePanel) return;
+    if (routePanel.classList.contains("hidden") || routePanel.classList.contains("is-hiding")) return;
+    routePanel.classList.remove("is-visible");
+    routePanel.classList.add("is-hiding");
+    panelHideTimer = setTimeout(() => {
+      routePanel.classList.add("hidden");
+      routePanel.classList.remove("is-hiding");
+      panelHideTimer = null;
+    }, 140);
+  }
+
+  function buildNarrative(pathLatLngs, pathNodeKeys, distanceMeters) {
+    if (!Array.isArray(pathLatLngs) || pathLatLngs.length < 2) {
+      return "From your position, route guidance is unavailable for this destination.";
+    }
+
+    const steps = [];
+    const legs = buildNamedLegs(pathLatLngs, pathNodeKeys);
+    const startLabel = gateMoved ? "your position" : "the gate";
+
+    const firstLeg = legs[0];
+    const firstRoad = firstLeg && firstLeg.name ? ` on ${formatRoadName(firstLeg.name)}` : "";
+    const firstDist = firstLeg
+      ? Math.max(5, Math.round(firstLeg.distanceMeters))
+      : Math.max(5, Math.round(pathLatLngs[0].distanceTo(pathLatLngs[1])));
+    steps.push(`From ${startLabel}, go straight ${formatTurnIcon("straight")}${firstRoad} for ${firstDist} meters.`);
+
+    for (let i = 1; i < legs.length && i <= 3; i++) {
+      const leg = legs[i];
+      const boundary = leg.startPointIndex;
+      const prev = pathLatLngs[boundary - 1];
+      const curr = pathLatLngs[boundary];
+      const next = pathLatLngs[boundary + 1];
+      const turn = prev && curr && next ? describeTurn(prev, curr, next) : null;
+      const roadRef = leg.name ? ` onto ${formatRoadName(leg.name)}` : "";
+      const dist = Math.max(5, Math.round(leg.distanceMeters));
+      const crossingCount = countCrossingsForLeg(pathNodeKeys, leg.startPointIndex, leg.endPointIndex);
+
+      if (turn) {
+        steps.push(`Then at crossing, turn ${turn} ${formatTurnIcon(turn.includes("left") ? "left" : "right")}${roadRef} and continue for ${dist} meters.`);
+      } else {
+        const crossingText = crossingCount > 0
+          ? ` after ${ordinalWord(crossingCount)} crossing`
+          : "";
+        steps.push(`Then continue straight ${formatTurnIcon("straight")}${crossingText}${roadRef} for ${dist} meters.`);
+      }
+    }
+
+    steps.push(`You will arrive after about ${Math.round(distanceMeters)} meters.`);
+    return steps.join(" ");
+  }
+
+  function formatRoadName(name) {
+    return `<span class="route-road-name">${escapeHtml(name)}</span>`;
+  }
+
+  function formatTurnIcon(type) {
+    const icon = type === "left" ? "←" : type === "right" ? "→" : "↑";
+    return `<span class="route-turn-icon" aria-hidden="true">${icon}</span>`;
+  }
+
+  function buildNamedLegs(pathLatLngs, pathNodeKeys) {
+    if (
+      !Array.isArray(pathLatLngs) ||
+      !Array.isArray(pathNodeKeys) ||
+      pathLatLngs.length !== pathNodeKeys.length ||
+      pathLatLngs.length < 2
+    ) {
+      return [];
+    }
+
+    const segments = [];
+    for (let i = 1; i < pathLatLngs.length; i++) {
+      const aKey = pathNodeKeys[i - 1];
+      const bKey = pathNodeKeys[i];
+      const name = roadNameByEdge.get(edgeNameKey(aKey, bKey)) || null;
+      const distanceMeters = pathLatLngs[i - 1].distanceTo(pathLatLngs[i]);
+      segments.push({
+        name,
+        distanceMeters,
+        startPointIndex: i - 1,
+        endPointIndex: i,
+      });
+    }
+
+    const legs = [];
+    for (const seg of segments) {
+      const prev = legs[legs.length - 1];
+      if (prev && prev.name === seg.name) {
+        prev.distanceMeters += seg.distanceMeters;
+        prev.endPointIndex = seg.endPointIndex;
+      } else {
+        legs.push({ ...seg });
+      }
+    }
+    return legs;
+  }
+
+  function countCrossingsForLeg(pathNodeKeys, startPointIndex, endPointIndex) {
+    if (!Array.isArray(pathNodeKeys) || !roadGraph || !roadGraph.adj) return 0;
+    let count = 0;
+    for (let i = startPointIndex + 1; i < endPointIndex; i++) {
+      const nodeKey = pathNodeKeys[i];
+      const degree = (roadGraph.adj.get(nodeKey) || []).length;
+      if (degree >= 3) count++;
+    }
+    return count;
+  }
+
+  function ordinalWord(n) {
+    const words = ["zero", "first", "second", "third", "fourth", "fifth", "sixth"];
+    return words[n] || `${n}th`;
+  }
+
+  function describeTurn(a, b, c) {
+    const bearingAB = bearingDegrees(a, b);
+    const bearingBC = bearingDegrees(b, c);
+    let delta = bearingBC - bearingAB;
+    while (delta > 180) delta -= 360;
+    while (delta < -180) delta += 360;
+
+    const abs = Math.abs(delta);
+    if (abs < 20) return null;
+    if (abs < 55) return delta > 0 ? "slightly right" : "slightly left";
+    return delta > 0 ? "right" : "left";
+  }
+
+  function bearingDegrees(from, to) {
+    const lat1 = (from.lat * Math.PI) / 180;
+    const lat2 = (to.lat * Math.PI) / 180;
+    const dLon = ((to.lng - from.lng) * Math.PI) / 180;
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x =
+      Math.cos(lat1) * Math.sin(lat2) -
+      Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    const brng = (Math.atan2(y, x) * 180) / Math.PI;
+    return (brng + 360) % 360;
   }
 
   /** Fully clears the current selection: highlight, route, and destination state. */
@@ -495,13 +782,43 @@ export function createMapController() {
     }
   }
 
-  /** Reopens the ETA popup when the currently highlighted unit is clicked again after closing it. */
+  /** Reopens the route panel when the highlighted unit is clicked again after dismissing it. */
   function reopenEtaPopupFor(layer) {
     if (!highlighted || !highlighted.layers.includes(layer) || !lastEtaInfo) return;
-    showEtaPopup(lastEtaInfo.latlng, lastEtaInfo.distanceMeters);
+    // Clicking the same active unit while panel is already shown should be a no-op.
+    if (routePanel && routePanel.classList.contains("is-visible") && !routePanel.classList.contains("hidden")) return;
+    renderRoutePanel(
+      lastEtaInfo.latlng,
+      lastEtaInfo.distanceMeters,
+      lastEtaInfo.pathLatLngs,
+      lastEtaInfo.pathNodeKeys,
+    );
   }
 
   function highlightBuilding(entry) {
+    const isSameAsCurrent =
+      highlighted &&
+      highlighted.props &&
+      highlighted.props.block === entry.props.block &&
+      highlighted.props.lot === entry.props.lot;
+
+    // Repeated Find on the same unit should not restart route/panel animations.
+    // If the panel was dismissed, reopen it using existing route details.
+    if (isSameAsCurrent && activeDest && lastEtaInfo) {
+      const panelVisible =
+        routePanel &&
+        routePanel.classList.contains("is-visible") &&
+        !routePanel.classList.contains("hidden");
+      if (panelVisible) return;
+      renderRoutePanel(
+        lastEtaInfo.latlng,
+        lastEtaInfo.distanceMeters,
+        lastEtaInfo.pathLatLngs,
+        lastEtaInfo.pathNodeKeys,
+      );
+      return;
+    }
+
     clearHighlight();
     clearRoute();
     entry.layer.setStyle({
@@ -580,5 +897,6 @@ export function createMapController() {
     highlightBuilding,
     highlightCityBlock,
     clearSelection,
+    setLayerVisibility,
   };
 }

@@ -33,20 +33,39 @@
           </button>
           <div id="layers-panel" class="layers-panel hidden">
             <label>
-              <input type="checkbox" id="layer-obstacle" checked />
+              <input type="checkbox" id="layer-obstacle" />
               Obstacle
             </label>
             <label>
-              <input type="checkbox" id="layer-leisure" checked />
-              Leisure
+              <input type="checkbox" id="layer-administrative" />
+              Administrative
             </label>
             <label>
-              <input type="checkbox" id="layer-administrative" checked />
-              Administrative
+              <input type="checkbox" id="layer-road-names" />
+              Road names
             </label>
           </div>
         </div>
       </form>
+
+      <aside id="route-panel" class="route-panel hidden" aria-live="polite">
+        <div class="route-panel-section route-panel-head">
+          <div id="route-unit" class="route-unit">Block -, Lot -</div>
+          <div id="route-meta" class="route-meta">ETA from the gate · -- km</div>
+        </div>
+        <div id="route-eta-rows" class="route-panel-section route-eta-rows"></div>
+        <div class="route-panel-section route-narrative-wrap">
+          <div id="route-narrative" class="route-narrative"></div>
+        </div>
+        <div class="route-panel-section route-actions">
+          <button type="button" id="route-clear" class="eta-clear" aria-label="Clear route">
+            Clear route
+          </button>
+          <button type="button" id="route-dismiss" class="eta-dismiss" aria-label="Dismiss">
+            Dismiss
+          </button>
+        </div>
+      </aside>
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

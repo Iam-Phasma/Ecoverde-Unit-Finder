@@ -8,8 +8,8 @@ const searchForm = document.getElementById("search-form");
 const layersToggle = document.getElementById("layers-toggle");
 const layersPanel = document.getElementById("layers-panel");
 const layerObstacle = document.getElementById("layer-obstacle");
-const layerLeisure = document.getElementById("layer-leisure");
 const layerAdministrative = document.getElementById("layer-administrative");
+const layerRoadNames = document.getElementById("layer-road-names");
 
 layersToggle.addEventListener("click", (e) => {
   e.stopPropagation();
@@ -24,11 +24,20 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// None of these are wired to existing layers yet — Obstacle/Leisure/Administrative
-// refer to data that hasn't been fetched, not the current barriers/leisure layers.
-layerObstacle.addEventListener("change", () => {});
-layerLeisure.addEventListener("change", () => {});
-layerAdministrative.addEventListener("change", () => {});
+layerObstacle.addEventListener("change", () => {
+  // Intentionally no-op for now.
+});
+
+layerAdministrative.addEventListener("change", () => {
+  // Intentionally no-op for now.
+});
+
+layerRoadNames.addEventListener("change", () => {
+  controller.setLayerVisibility("roadNames", layerRoadNames.checked);
+});
+
+// Default state: all optional layers are off.
+controller.setLayerVisibility("roadNames", layerRoadNames.checked);
 
 searchForm.addEventListener("submit", (e) => {
   e.preventDefault();
