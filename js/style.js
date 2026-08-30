@@ -178,10 +178,22 @@ export function styleForFeature(feature) {
         fillOpacity: 0.9,
       };
     case "natural":
+      if (
+        feature.properties.natural === "water" ||
+        feature.properties.natural === "wetland" ||
+        feature.properties.natural === "bay"
+      ) {
+        return {
+          color: "#8fbede",
+          weight: 1,
+          fillColor: "#a9d3e6",
+          fillOpacity: 0.9,
+        };
+      }
       return {
-        color: "#8fbede",
+        color: "#9fc98f",
         weight: 1,
-        fillColor: "#a9d3e6",
+        fillColor: "#b9dcae",
         fillOpacity: 0.9,
       };
     case "building":

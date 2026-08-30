@@ -288,9 +288,14 @@ export function createMapController() {
   function populateAdministrativePins(features) {
     if (!Array.isArray(features)) return;
     const bestByType = new Map();
+    const modelUnitPins = [];
     for (const feature of features) {
       const pin = pinMetaForFeature(feature);
       if (!pin) continue;
+      if (pin.type === "modelUnit") {
+        modelUnitPins.push({ feature, pin });
+        continue;
+      }
       const existing = bestByType.get(pin.type);
       if (!existing || pin.score > existing.pin.score) {
         bestByType.set(pin.type, { feature, pin });
@@ -298,6 +303,12 @@ export function createMapController() {
     }
 
     for (const { feature, pin } of bestByType.values()) {
+      const latlng = featureCenterLatLng(feature);
+      if (!latlng) continue;
+      layers.administrative.addLayer(createAdministrativePin(latlng, pin));
+    }
+
+    for (const { feature, pin } of modelUnitPins) {
       const latlng = featureCenterLatLng(feature);
       if (!latlng) continue;
       layers.administrative.addLayer(createAdministrativePin(latlng, pin));
@@ -332,6 +343,18 @@ export function createMapController() {
     ) {
       const score = props.category === "poi-office" ? 3 : 2;
       return { type: "realEstate", icon: "🏢", label: "Real Estate Office", score };
+    }
+    if (name.toLowerCase().includes("model unit")) {
+      return {
+        type: "modelUnit",
+        icon: "🏠",
+        label: "Model Unit",
+        score: 2,
+      };
+    }
+    if (props.building === "pavilion" || props.building === "gazebo") {
+      const score = name.toLowerCase().includes("club house") ? 3 : 1;
+      return { type: "pavilion", icon: "🏛️", label: "Pavilion", score };
     }
     return null;
   }
