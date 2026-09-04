@@ -142,6 +142,8 @@ export function createMapController() {
   let avoidedEdgeKeys = new Set();
   let avoidPickHandler = null;
   let panelHideTimer = null;
+  let panelMode = "route"; // "route" | "block"
+  let unitCountByBlock = new Map();
 
   routeDismissBtn?.addEventListener("click", () => hideRoutePanel());
   routeClearBtn?.addEventListener("click", () => clearSelection());
@@ -244,6 +246,9 @@ export function createMapController() {
     });
 
     populateBlockSelect(lotsByBlock, cityBlockLayersByKey);
+    unitCountByBlock = new Map(
+      [...lotsByBlock.entries()].map(([block, lots]) => [block, lots.size]),
+    );
 
     roadGraph = buildRoadGraph(collection.features);
     mainRoadComponent = largestComponentKeys(roadGraph);
@@ -1137,6 +1142,8 @@ export function createMapController() {
   function renderRoutePanel(latlng, distanceMeters, pathLatLngs, pathNodeKeys, options = {}) {
     if (!routePanel || !routeUnitEl || !routeMetaEl || !routeEtaRowsEl || !routeNarrativeEl) return;
 
+    setPanelMode("route");
+
     lastEtaInfo = { latlng, distanceMeters, pathLatLngs, pathNodeKeys };
     const distanceKm = distanceMeters / 1000;
 
@@ -1161,6 +1168,51 @@ export function createMapController() {
 
     routeNarrativeEl.innerHTML = buildNarrative(pathLatLngs, pathNodeKeys, distanceMeters);
     showRoutePanel(options);
+  }
+
+  /** Renders the corner panel for block-only search with block details and unit count. */
+  function renderBlockPanel(entry) {
+    if (!routePanel || !routeUnitEl || !routeMetaEl) return;
+    setPanelMode("block");
+
+    const block = entry?.props?.block || "-";
+    const units = unitCountByBlock.get(block);
+    routeUnitEl.textContent = `Block ${block}`;
+    routeMetaEl.textContent = Number.isFinite(units)
+      ? `${units} unit${units === 1 ? "" : "s"}`
+      : "Unit count unavailable";
+
+    showRoutePanel();
+  }
+
+  function setPanelMode(mode) {
+    panelMode = mode;
+    if (!routePanel) return;
+
+    const isBlockMode = mode === "block";
+    routePanel.classList.toggle("route-panel--block", isBlockMode);
+
+    if (routeEtaRowsEl) routeEtaRowsEl.hidden = isBlockMode;
+    const narrativeWrap = routeNarrativeEl?.closest(".route-narrative-wrap");
+    if (narrativeWrap) narrativeWrap.hidden = isBlockMode;
+    if (routeRerouteBtn) routeRerouteBtn.hidden = isBlockMode;
+
+    if (routeClearBtn) {
+      routeClearBtn.textContent = isBlockMode ? "Close" : "Clear route";
+      routeClearBtn.setAttribute(
+        "aria-label",
+        isBlockMode ? "Close block selection" : "Clear route",
+      );
+      routeClearBtn.title = isBlockMode
+        ? "Clear block selection"
+        : "Clear route and selection";
+    }
+
+    if (routeDismissBtn) {
+      routeDismissBtn.textContent = "Dismiss";
+      routeDismissBtn.setAttribute("aria-label", "Dismiss");
+      routeDismissBtn.title = "Close panel";
+    }
   }
 
   function showRoutePanel(options = {}) {
@@ -1482,24 +1534,9 @@ export function createMapController() {
 
     if (bounds) {
       map.fitBounds(bounds, { maxZoom: 19, padding: [40, 40] });
-      showBlockClearButton(bounds);
     }
-  }
 
-  /** Places a small × button at the top of the highlighted block boundary to clear the selection. */
-  function showBlockClearButton(bounds) {
-    const topCenter = L.latLng(bounds.getNorth(), bounds.getCenter().lng);
-    L.marker(topCenter, {
-      icon: L.divIcon({
-        className: "block-clear-marker",
-        html: '<div class="block-clear-handle" title="Clear selection">&times;</div>',
-        iconSize: [26, 26],
-        iconAnchor: [13, 13],
-      }),
-      title: "Clear selection",
-    })
-      .addTo(layers.route)
-      .on("click", () => clearSelection());
+    renderBlockPanel(entry);
   }
 
   return {
