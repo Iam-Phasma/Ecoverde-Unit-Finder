@@ -24,6 +24,7 @@ const ETA_SPEEDS_KMH = { car: 20, motorcycle: 25, bicycle: 15, walk: 5 };
 const MIN_REPOSITION_ROUTE_KM = 0.01;
 const ROAD_TAP_MAX_SNAP_PX = 16;
 const REROUTE_PICK_BANNER_TEXT = "Tap the road segment you want to avoid.";
+const ROUTE_DEBUG_STORAGE_KEY = "ecoverde:route-debug";
 
 function blockageMarkerIconSvg() {
   return '<svg class="avoid-marker-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-4.5 9h9"/></svg>';
@@ -144,6 +145,23 @@ export function createMapController() {
   let panelHideTimer = null;
   let panelMode = "route"; // "route" | "block"
   let unitCountByBlock = new Map();
+  let routeDebugEnabled = readRouteDebugEnabled();
+
+  // Small console API for debugging route narrative decisions.
+  if (typeof window !== "undefined") {
+    window.ecoverdeRouteDebug = {
+      get enabled() {
+        return routeDebugEnabled;
+      },
+      set enabled(value) {
+        routeDebugEnabled = setRouteDebugEnabled(Boolean(value));
+      },
+      toggle() {
+        routeDebugEnabled = setRouteDebugEnabled(!routeDebugEnabled);
+        return routeDebugEnabled;
+      },
+    };
+  }
 
   routeDismissBtn?.addEventListener("click", () => hideRoutePanel());
   routeClearBtn?.addEventListener("click", () => clearSelection());
@@ -501,7 +519,7 @@ export function createMapController() {
     const minLon = Math.min(...lons);
     const maxLon = Math.max(...lons);
 
-    const spacingMeters = 6;
+    const spacingMeters = 4.8;
     const meanLat = (minLat + maxLat) / 2;
     const metersPerDegLat = 111320;
     const metersPerDegLon = Math.max(
@@ -513,24 +531,27 @@ export function createMapController() {
 
     const polygon = ring.map((p) => [p.lat, p.lng]);
     let count = 0;
-    const maxDots = 1400;
+    const maxDots = 2400;
+    let rowIndex = 0;
 
     for (let lat = minLat + dLat * 0.5; lat <= maxLat; lat += dLat) {
-      for (let lon = minLon + dLon * 0.5; lon <= maxLon; lon += dLon) {
+      const rowOffset = rowIndex % 2 === 0 ? dLon * 0.5 : dLon;
+      for (let lon = minLon + rowOffset; lon <= maxLon; lon += dLon) {
         if (count >= maxDots) break;
         if (!pointInPolygon([lat, lon], polygon)) continue;
         layers.leisureDots.addLayer(
           L.circleMarker([lat, lon], {
-            radius: 1.25,
-            color: "#7faa73",
+            radius: 1.1,
+            color: "#a7c56a",
             weight: 0,
-            fillColor: "#7faa73",
-            fillOpacity: 0.92,
+            fillColor: "#a7c56a",
+            fillOpacity: 0.72,
             interactive: false,
           }),
         );
         count++;
       }
+      rowIndex++;
       if (count >= maxDots) break;
     }
   }
@@ -1267,37 +1288,170 @@ export function createMapController() {
     const steps = [];
     const legs = buildNamedLegs(pathLatLngs, pathNodeKeys);
     const startLabel = gateMoved ? "your position" : "the gate";
+    const debugRows = [];
 
     const firstLeg = legs[0];
     const firstRoad = firstLeg && firstLeg.name ? ` on ${formatRoadName(firstLeg.name)}` : "";
     const firstDist = firstLeg
       ? Math.max(5, Math.round(firstLeg.distanceMeters))
       : Math.max(5, Math.round(pathLatLngs[0].distanceTo(pathLatLngs[1])));
-    steps.push(`From ${startLabel}, go straight ${formatTurnIcon("straight")}${firstRoad} for ${firstDist} meters.`);
+    steps.push(`From ${startLabel}, head out${firstRoad} for ${firstDist} meters.`);
+    if (routeDebugEnabled) {
+      debugRows.push({
+        step: 0,
+        kind: "start",
+        from: "start",
+        to: firstLeg?.name || "(unnamed)",
+        boundary: "-",
+        isIntersection: "-",
+        turn: "-",
+        announcedTurn: "-",
+        roadNameChanges: "-",
+        crossingsBeforeTurn: "-",
+        crossingsWithinLeg: firstLeg
+          ? countCrossingsForLeg(pathNodeKeys, firstLeg.startPointIndex, firstLeg.endPointIndex)
+          : 0,
+        meters: firstDist,
+        instruction: steps[steps.length - 1],
+      });
+    }
 
-    for (let i = 1; i < legs.length && i <= 3; i++) {
+    for (let i = 1; i < legs.length; i++) {
       const leg = legs[i];
+      const prevLeg = legs[i - 1];
       const boundary = leg.startPointIndex;
       const prev = pathLatLngs[boundary - 1];
       const curr = pathLatLngs[boundary];
       const next = pathLatLngs[boundary + 1];
       const turn = prev && curr && next ? describeTurn(prev, curr, next) : null;
+      const boundaryIsIntersection = isRealIntersectionOnPath(pathNodeKeys, boundary);
+      const lastBoundaryBeforeDestination = i === legs.length - 1;
+      const roadNameChanges = (prevLeg?.name || null) !== (leg.name || null);
+      const notableTurn = isNotableTurn(turn);
+      const shouldAnnounceTurn =
+        Boolean(turn) &&
+        (
+          boundaryIsIntersection ||
+          roadNameChanges ||
+          (lastBoundaryBeforeDestination && notableTurn)
+        );
+      const effectiveTurn = shouldAnnounceTurn ? turn : null;
       const roadRef = leg.name ? ` onto ${formatRoadName(leg.name)}` : "";
       const dist = Math.max(5, Math.round(leg.distanceMeters));
       const crossingCount = countCrossingsForLeg(pathNodeKeys, leg.startPointIndex, leg.endPointIndex);
+      const turnCrossingCount = prevLeg
+        ? countCrossingsForLeg(
+            pathNodeKeys,
+            prevLeg.startPointIndex,
+            prevLeg.endPointIndex,
+          )
+        : 0;
 
-      if (turn) {
-        steps.push(`Then at crossing, turn ${turn} ${formatTurnIcon(turn.includes("left") ? "left" : "right")}${roadRef} and continue for ${dist} meters.`);
+      if (effectiveTurn) {
+        if (turnCrossingCount > 1) {
+          steps.push(`Then after ${ordinalWord(turnCrossingCount)} intersection, turn ${effectiveTurn} ${formatTurnIcon(effectiveTurn.includes("left") ? "left" : "right")}${roadRef} and continue for ${dist} meters.`);
+        } else if (turnCrossingCount === 1) {
+          steps.push(`Then at intersection, turn ${effectiveTurn} ${formatTurnIcon(effectiveTurn.includes("left") ? "left" : "right")}${roadRef} and continue for ${dist} meters.`);
+        } else {
+          steps.push(`Then turn ${effectiveTurn} ${formatTurnIcon(effectiveTurn.includes("left") ? "left" : "right")}${roadRef} and continue for ${dist} meters.`);
+        }
       } else {
         const crossingText = crossingCount > 0
-          ? ` after ${ordinalWord(crossingCount)} crossing`
+          ? ` after ${ordinalWord(crossingCount)} intersection`
           : "";
-        steps.push(`Then continue straight ${formatTurnIcon("straight")}${crossingText}${roadRef} for ${dist} meters.`);
+        if (!crossingText && !roadRef) {
+          steps.push(`Then continue for ${dist} meters.`);
+        } else if (roadRef && !crossingText) {
+          steps.push(`Then continue on ${formatRoadName(leg.name)} for ${dist} meters.`);
+        } else {
+          steps.push(`Then continue straight ${formatTurnIcon("straight")}${crossingText}${roadRef} for ${dist} meters.`);
+        }
+      }
+
+      if (routeDebugEnabled) {
+        debugRows.push({
+          step: i,
+          kind: "leg",
+          from: prevLeg?.name || "(unnamed)",
+          to: leg.name || "(unnamed)",
+          boundary,
+          isIntersection: boundaryIsIntersection,
+          turn: turn || "none",
+          announcedTurn: effectiveTurn || "none",
+          roadNameChanges,
+          crossingsBeforeTurn: turnCrossingCount,
+          crossingsWithinLeg: crossingCount,
+          meters: dist,
+          instruction: steps[steps.length - 1],
+        });
       }
     }
 
     steps.push(`You will arrive after about ${Math.round(distanceMeters)} meters.`);
+    if (routeDebugEnabled) {
+      logRouteNarrativeDebug({
+        startLabel,
+        gateMoved,
+        totalMeters: Math.round(distanceMeters),
+        legsCount: legs.length,
+        pathPoints: pathLatLngs.length,
+        rows: debugRows,
+        finalInstruction: steps[steps.length - 1],
+      });
+    }
     return steps.join(" ");
+  }
+
+  function readRouteDebugEnabled() {
+    let fromQuery = null;
+    try {
+      const params = new URLSearchParams(window.location.search || "");
+      const raw = (params.get("routeDebug") || "").toLowerCase();
+      if (["1", "true", "yes", "on"].includes(raw)) fromQuery = true;
+      if (["0", "false", "no", "off"].includes(raw)) fromQuery = false;
+    } catch {
+      fromQuery = null;
+    }
+
+    if (fromQuery !== null) {
+      setRouteDebugEnabled(fromQuery);
+      return fromQuery;
+    }
+
+    try {
+      return window.localStorage.getItem(ROUTE_DEBUG_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function setRouteDebugEnabled(enabled) {
+    const next = Boolean(enabled);
+    try {
+      if (next) {
+        window.localStorage.setItem(ROUTE_DEBUG_STORAGE_KEY, "1");
+      } else {
+        window.localStorage.removeItem(ROUTE_DEBUG_STORAGE_KEY);
+      }
+    } catch {
+      // Ignore storage errors in private mode or restricted contexts.
+    }
+    console.info(`[route-debug] ${next ? "enabled" : "disabled"}`);
+    return next;
+  }
+
+  function logRouteNarrativeDebug(summary) {
+    console.groupCollapsed(
+      `[route-debug] ${summary.startLabel} -> destination · ${summary.totalMeters}m · ${summary.legsCount} leg(s)`,
+    );
+    console.log({
+      gateMoved: summary.gateMoved,
+      pathPoints: summary.pathPoints,
+      totalMeters: summary.totalMeters,
+      finalInstruction: summary.finalInstruction,
+    });
+    console.table(summary.rows || []);
+    console.groupEnd();
   }
 
   function formatRoadName(name) {
@@ -1324,7 +1478,7 @@ export function createMapController() {
     for (let i = 1; i < pathLatLngs.length; i++) {
       const aKey = pathNodeKeys[i - 1];
       const bKey = pathNodeKeys[i];
-      const name = roadNameByEdge.get(edgeNameKey(aKey, bKey)) || null;
+      const name = resolveSegmentRoadName(aKey, bKey);
       const distanceMeters = pathLatLngs[i - 1].distanceTo(pathLatLngs[i]);
       segments.push({
         name,
@@ -1337,25 +1491,155 @@ export function createMapController() {
     const legs = [];
     for (const seg of segments) {
       const prev = legs[legs.length - 1];
-      if (prev && prev.name === seg.name) {
+      let isStraightContinuation = false;
+      let boundaryIsIntersection = false;
+      if (prev) {
+        const boundary = seg.startPointIndex;
+        boundaryIsIntersection = isRealIntersectionOnPath(pathNodeKeys, boundary);
+        const a = pathLatLngs[boundary - 1];
+        const b = pathLatLngs[boundary];
+        const c = pathLatLngs[boundary + 1];
+        const turn = a && b && c ? describeTurn(a, b, c) : null;
+        isStraightContinuation = !turn;
+      }
+
+      const hasSameNamedRoad =
+        Boolean(prev?.name) && Boolean(seg.name) && prev.name === seg.name;
+      const isNonIntersectionContinuation = Boolean(prev) && !boundaryIsIntersection;
+      const isUnnamedStraightContinuation =
+        Boolean(prev) && !prev.name && !seg.name &&
+        (isStraightContinuation || isNonIntersectionContinuation);
+      const isNamedStraightContinuation =
+        Boolean(prev) && hasSameNamedRoad &&
+        (isStraightContinuation || isNonIntersectionContinuation);
+      const isUnnamedNamedStraightContinuation =
+        Boolean(prev) && isNonIntersectionContinuation && isStraightContinuation &&
+        ((Boolean(prev.name) && !seg.name) || (!prev.name && Boolean(seg.name)));
+
+      if (
+        prev &&
+        (
+          isNamedStraightContinuation ||
+          isUnnamedStraightContinuation ||
+          isUnnamedNamedStraightContinuation
+        )
+      ) {
+        // Preserve whichever segment carries a road name when one side is unnamed.
+        if (!prev.name && seg.name) prev.name = seg.name;
         prev.distanceMeters += seg.distanceMeters;
         prev.endPointIndex = seg.endPointIndex;
       } else {
         legs.push({ ...seg });
       }
     }
+
+    // The destination is snapped onto the nearest road segment, which can leave a tiny
+    // unnamed tail leg (e.g., 5-10m) that reads as a redundant extra "continue straight".
+    // Fold that tail into the previous leg when no real intersection separates them.
+    if (legs.length >= 2) {
+      const last = legs[legs.length - 1];
+      const prev = legs[legs.length - 2];
+      const boundary = last.startPointIndex;
+      const hasDecisionBoundary = isRealIntersectionOnPath(pathNodeKeys, boundary);
+      const a = pathLatLngs[boundary - 1];
+      const b = pathLatLngs[boundary];
+      const c = pathLatLngs[boundary + 1];
+      const boundaryTurn = a && b && c ? describeTurn(a, b, c) : null;
+      const hasNotableBoundaryTurn = isNotableTurn(boundaryTurn);
+      const isShortUnnamedTail = !last.name && last.distanceMeters <= 20;
+      if (isShortUnnamedTail && !hasDecisionBoundary && !hasNotableBoundaryTurn) {
+        prev.distanceMeters += last.distanceMeters;
+        prev.endPointIndex = last.endPointIndex;
+        legs.pop();
+      }
+    }
+
     return legs;
+  }
+
+  function resolveSegmentRoadName(aKey, bKey) {
+    const direct = roadNameByEdge.get(edgeNameKey(aKey, bKey));
+    if (direct) return direct;
+
+    const aMeta = roadGraph?.snapMeta?.get(aKey);
+    const bMeta = roadGraph?.snapMeta?.get(bKey);
+
+    if (aMeta && (bKey === aMeta.aKey || bKey === aMeta.bKey)) {
+      return roadNameByEdge.get(aMeta.edgeKey) || null;
+    }
+    if (bMeta && (aKey === bMeta.aKey || aKey === bMeta.bKey)) {
+      return roadNameByEdge.get(bMeta.edgeKey) || null;
+    }
+    if (aMeta && bMeta && aMeta.edgeKey === bMeta.edgeKey) {
+      return roadNameByEdge.get(aMeta.edgeKey) || null;
+    }
+
+    return null;
   }
 
   function countCrossingsForLeg(pathNodeKeys, startPointIndex, endPointIndex) {
     if (!Array.isArray(pathNodeKeys) || !roadGraph || !roadGraph.adj) return 0;
     let count = 0;
     for (let i = startPointIndex + 1; i < endPointIndex; i++) {
-      const nodeKey = pathNodeKeys[i];
-      const degree = (roadGraph.adj.get(nodeKey) || []).length;
-      if (degree >= 3) count++;
+      if (isRealIntersectionOnPath(pathNodeKeys, i)) count++;
     }
     return count;
+  }
+
+  function bearingBetweenCoords(a, b) {
+    const lat1 = (a[1] * Math.PI) / 180;
+    const lat2 = (b[1] * Math.PI) / 180;
+    const dLon = ((b[0] - a[0]) * Math.PI) / 180;
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x =
+      Math.cos(lat1) * Math.sin(lat2) -
+      Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    const brng = (Math.atan2(y, x) * 180) / Math.PI;
+    return (brng + 360) % 360;
+  }
+
+  function bearingDeltaDegrees(from, to) {
+    let delta = to - from;
+    while (delta > 180) delta -= 360;
+    while (delta < -180) delta += 360;
+    return delta;
+  }
+
+  /**
+   * Counts only real decision intersections for narrative text.
+   * Lane merges/splits near the gate are ignored by requiring an off-route branch
+   * with meaningful length and angular separation from the current travel direction.
+   */
+  function isRealIntersectionOnPath(pathNodeKeys, nodeIndex) {
+    if (!Array.isArray(pathNodeKeys) || !roadGraph?.adj || !roadGraph?.nodes) {
+      return false;
+    }
+    const nodeKey = pathNodeKeys[nodeIndex];
+    const prevKey = pathNodeKeys[nodeIndex - 1];
+    const nextKey = pathNodeKeys[nodeIndex + 1];
+    if (!nodeKey || !prevKey || !nextKey) return false;
+
+    const edges = roadGraph.adj.get(nodeKey) || [];
+    if (edges.length < 3) return false;
+
+    const nodeCoord = roadGraph.nodes.get(nodeKey);
+    const nextCoord = roadGraph.nodes.get(nextKey);
+    if (!nodeCoord || !nextCoord) return false;
+    const forwardBearing = bearingBetweenCoords(nodeCoord, nextCoord);
+
+    for (const edge of edges) {
+      if (edge.to === prevKey || edge.to === nextKey) continue;
+      // Tiny connector stubs are usually split/merge geometry, not a navigation decision.
+      if ((edge.dist || 0) < 7) continue;
+      const branchCoord = roadGraph.nodes.get(edge.to);
+      if (!branchCoord) continue;
+      const branchBearing = bearingBetweenCoords(nodeCoord, branchCoord);
+      const delta = Math.abs(bearingDeltaDegrees(forwardBearing, branchBearing));
+      // A meaningful side branch indicates a real intersection/junction.
+      if (delta >= 35 && delta <= 150) return true;
+    }
+
+    return false;
   }
 
   function ordinalWord(n) {
@@ -1374,6 +1658,10 @@ export function createMapController() {
     if (abs < 20) return null;
     if (abs < 55) return delta > 0 ? "slightly right" : "slightly left";
     return delta > 0 ? "right" : "left";
+  }
+
+  function isNotableTurn(turn) {
+    return turn === "left" || turn === "right";
   }
 
   function bearingDegrees(from, to) {
