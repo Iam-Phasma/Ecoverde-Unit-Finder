@@ -420,6 +420,16 @@ main {
   font-size: 0;
 }
 
+.recenter-control {
+  display: flex;
+  flex-direction: column;
+}
+
+.recenter-control a {
+  width: 36px;
+  height: 36px;
+}
+
 .recenter-control a svg {
   width: 20px;
   height: 20px;
