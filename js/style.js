@@ -49,7 +49,7 @@ function roadStyle(props) {
 
   if (WALK_HIGHWAYS.has(hw)) {
     return {
-      color: "#b98a4e",
+      color: "#8f8b80",
       weight: 2.5,
       opacity: 0.9,
       dashArray: "1,7",
@@ -153,10 +153,29 @@ export function styleForFeature(feature) {
     case "barrier":
       return barrierStyle(feature.properties);
     case "landuse":
+      if (
+        feature.properties.landuse === "grass" ||
+        feature.properties.landuse === "grassland"
+      ) {
+        return {
+          color: "#5f8f4c",
+          weight: 1,
+          fillColor: "#7fb769",
+          fillOpacity: 0.94,
+        };
+      }
+      if (feature.properties.landuse === "industrial") {
+        return {
+          color: "#9bad92",
+          weight: 1,
+          fillColor: "#c7d9bc",
+          fillOpacity: 0.9,
+        };
+      }
       return {
-        color: "#b7ceac",
+        color: "#9db99a",
         weight: 1,
-        fillColor: "#cfe3c7",
+        fillColor: "#c6dbc0",
         fillOpacity: 0.9,
       };
     case "leisure":
@@ -169,6 +188,17 @@ export function styleForFeature(feature) {
           weight: 1,
           fillColor: "#c9c5bc",
           fillOpacity: 0.95,
+        };
+      }
+      if (
+        feature.properties.leisure === "garden" ||
+        feature.properties.leisure === "park"
+      ) {
+        return {
+          color: "#598845",
+          weight: 1,
+          fillColor: "#74ad61",
+          fillOpacity: 0.94,
         };
       }
       return {
@@ -188,6 +218,14 @@ export function styleForFeature(feature) {
           weight: 1,
           fillColor: "#a9d3e6",
           fillOpacity: 0.9,
+        };
+      }
+      if (feature.properties.natural === "grassland") {
+        return {
+          color: "#598845",
+          weight: 1,
+          fillColor: "#74ad61",
+          fillOpacity: 0.94,
         };
       }
       return {
@@ -230,11 +268,11 @@ export function styleForFeature(feature) {
       };
     case "poi-tree":
       return {
-        color: "#b7cf63",
+        color: "#5f8d47",
         weight: 0,
         opacity: 1,
-        fillColor: "#b7cf63",
-        fillOpacity: 0.58,
+        fillColor: "#5f8d47",
+        fillOpacity: 0.7,
       };
     case "poi-shop":
     case "poi-amenity":
@@ -263,18 +301,18 @@ export function pointToLayer(feature, latlng) {
     "poi-amenity": "#2f7d4f",
     "poi-office": "#3a5fcd",
     "poi-leisure": "#2f7d4f",
-    "poi-tree": "#7fbf7f",
+    "poi-tree": "#5f8d47",
   };
   const color = colors[feature.properties.category] || "#555";
   // Keep only actual OSM tree points visible. Hide other POI point markers.
   if (feature.properties && feature.properties.category === "poi-tree") {
     const outer = L.circleMarker(latlng, {
       radius: 8,
-      color: "#b7cf63",
+      color: "#5f8d47",
       weight: 0,
       opacity: 1,
-      fillColor: "#b7cf63",
-      fillOpacity: 0.58,
+      fillColor: "#5f8d47",
+      fillOpacity: 0.7,
       interactive: false,
     });
     const core = L.marker(latlng, {
@@ -283,7 +321,6 @@ export function pointToLayer(feature, latlng) {
         iconSize: [4, 4],
         iconAnchor: [2, 2],
       }),
-      interactive: false,
       keyboard: false,
     });
     return L.featureGroup([outer, core]);
