@@ -11,7 +11,6 @@ const PRECACHE_URLS = [
   "js/graph.js",
   "js/style.js",
   "js/utils.js",
-  "data/ecoverde.geojson",
 ];
 
 self.addEventListener("install", (event) => {
@@ -46,7 +45,7 @@ self.addEventListener("fetch", (event) => {
   const isMapData = url.pathname.endsWith("/data/ecoverde.geojson") || url.pathname.endsWith("data/ecoverde.geojson");
 
   if (isMapData) {
-    event.respondWith(staleWhileRevalidate(request));
+    event.respondWith(networkFirstMapData(request));
     return;
   }
 
@@ -76,4 +75,17 @@ async function staleWhileRevalidate(request) {
     .catch(() => cached);
 
   return cached || networkPromise;
+}
+
+async function networkFirstMapData(request) {
+  const cache = await caches.open(RUNTIME_CACHE);
+  try {
+    const fresh = await fetch(request, { cache: "no-store" });
+    cache.put(request, fresh.clone());
+    return fresh;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    throw new Error("Map data unavailable");
+  }
 }
