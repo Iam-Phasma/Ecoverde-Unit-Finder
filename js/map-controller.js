@@ -156,7 +156,7 @@ export function createMapController() {
   map.on("zoomend", refreshRoadNameLabels);
 
   function loadData(url) {
-    fetch(url)
+    fetch(url, { cache: "no-store" })
       .then((res) => res.json())
       .then(renderData)
       .catch((err) => console.error("Failed to load map data", err));
