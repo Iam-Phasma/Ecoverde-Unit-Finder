@@ -2,7 +2,8 @@
 
 A clean, low-poly interactive map of **Ecoverde Homes** (Quilib, Rosario, Batangas) focused on fast **block/lot unit finding** and practical in-subdivision routing.
 
-Open: https://ecoverde-unit-finder.vercel.app/
+Vercel: https://ecoverde-unit-finder.vercel.app/ \
+Pages: https://iam-phasma.github.io/Ecoverde-Unit-Finder/
 
 ## What you can do
 
