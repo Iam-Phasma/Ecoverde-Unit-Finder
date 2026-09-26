@@ -359,7 +359,14 @@ export function createMapController() {
       }
       group.addLayer(layer);
       if (category === "leisure") {
-        if (!(props.sport === "basketball" || props.surface === "concrete")) {
+        if (props.leisure === "park" || props.leisure === "garden") {
+          addParkCenterShade(layer);
+        }
+        if (
+          !(props.sport === "basketball" || props.surface === "concrete") &&
+          props.leisure !== "garden" &&
+          props.leisure !== "park"
+        ) {
           addLeisureTextureDots(layer);
         }
       }
@@ -824,6 +831,80 @@ export function createMapController() {
       rowIndex++;
       if (count >= maxDots) break;
     }
+  }
+
+  // Adds a subtle darker middle tone for park polygons, without texture dots.
+  function addParkCenterShade(layer) {
+    const ring = getOuterRingLatLngs(layer);
+    if (!ring || ring.length < 3) return;
+
+    const center = ring.reduce(
+      (acc, p) => ({ lat: acc.lat + p.lat, lng: acc.lng + p.lng }),
+      { lat: 0, lng: 0 },
+    );
+    center.lat /= ring.length;
+    center.lng /= ring.length;
+
+    const innerRingOuter = smoothClosedRing(
+      scaleRingTowardsCenter(ring, center, 0.74),
+      2,
+    );
+    const innerRingCore = smoothClosedRing(
+      scaleRingTowardsCenter(ring, center, 0.52),
+      2,
+    );
+
+    layers.leisure.addLayer(
+      L.polygon(innerRingOuter, {
+        stroke: false,
+        fillColor: "#80b24f",
+        fillOpacity: 0.16,
+        interactive: false,
+        renderer: bakedRenderer,
+      }),
+    );
+
+    layers.leisure.addLayer(
+      L.polygon(innerRingCore, {
+        stroke: false,
+        fillColor: "#74a546",
+        fillOpacity: 0.2,
+        interactive: false,
+        renderer: bakedRenderer,
+      }),
+    );
+  }
+
+  function scaleRingTowardsCenter(ring, center, scale) {
+    return ring.map((p) =>
+      L.latLng(
+        center.lat + (p.lat - center.lat) * scale,
+        center.lng + (p.lng - center.lng) * scale,
+      ),
+    );
+  }
+
+  // Chaikin corner-cutting for a softer rounded polygon silhouette.
+  function smoothClosedRing(ring, iterations = 1) {
+    let points = Array.isArray(ring) ? ring.slice() : [];
+    if (points.length < 3) return points;
+
+    for (let k = 0; k < iterations; k++) {
+      const next = [];
+      for (let i = 0; i < points.length; i++) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        next.push(
+          L.latLng(a.lat * 0.75 + b.lat * 0.25, a.lng * 0.75 + b.lng * 0.25),
+        );
+        next.push(
+          L.latLng(a.lat * 0.25 + b.lat * 0.75, a.lng * 0.25 + b.lng * 0.75),
+        );
+      }
+      points = next;
+    }
+
+    return points;
   }
 
   function getOuterRingLatLngs(layer) {

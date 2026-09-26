@@ -23,6 +23,18 @@ node tools/serve.js
 
 Then open http://localhost:8080 in your browser.
 
+## Root file layout
+
+These files intentionally stay at the repository root:
+
+- `index.html`: App entry page.
+- `style.css`: Global map/app styles.
+- `sw.js`: Service worker (must remain at root to control the full app scope).
+- `favicon.svg`, `tree.svg`: Static root-served assets.
+- `README.md`, `LICENSE`: Project metadata.
+
+All map data belongs in `data/`, app logic in `js/`, and maintenance scripts in `tools/`.
+
 ## Refreshing the map data
 
 If you edited OSM and want the map to pick it up, re-fetch and rebuild in one step:
