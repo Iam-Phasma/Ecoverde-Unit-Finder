@@ -219,6 +219,11 @@ main {
   stroke-linecap: round;
 }
 
+.scrapyard-stripes {
+  fill: url(#scrapyard-stripes-pattern) !important;
+  fill-opacity: 1 !important;
+}
+
 .tree-icon {
   background-image: url("./tree.svg");
   background-repeat: no-repeat;

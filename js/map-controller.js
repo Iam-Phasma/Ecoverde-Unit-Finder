@@ -100,6 +100,7 @@ export function createMapController() {
     context: L.layerGroup().addTo(map),
     landuse: L.layerGroup().addTo(map),
     leisure: L.layerGroup().addTo(map),
+    leisureCourts: L.layerGroup().addTo(map),
     leisureDots: L.layerGroup().addTo(map),
     roadNames: L.layerGroup().addTo(map),
     cityBlocks: L.layerGroup().addTo(map),
@@ -282,10 +283,17 @@ export function createMapController() {
 
     geoJsonLayer.eachLayer((layer) => {
       const category = layer.feature.properties.category;
-      const group = layers[groupForCategory(category)] || layers.buildings;
+      const props = layer.feature?.properties || {};
+      let group = layers[groupForCategory(category)] || layers.buildings;
+      if (
+        category === "leisure" &&
+        (props.sport === "basketball" || props.surface === "concrete")
+      ) {
+        // Draw hard courts above generic leisure fills so they remain visible.
+        group = layers.leisureCourts;
+      }
       group.addLayer(layer);
       if (category === "leisure") {
-        const props = layer.feature?.properties || {};
         if (!(props.sport === "basketball" || props.surface === "concrete")) {
           addLeisureTextureDots(layer);
         }
@@ -320,9 +328,48 @@ export function createMapController() {
     window.addEventListener("resize", updateMinZoom);
     populateObstaclePins(collection.features);
     populateAdministrativePins(collection.features);
+    ensureScrapyardPattern();
     updateAdministrativeClusters();
     applyRoadStrokeScale();
     refreshRoadNameLabels();
+  }
+
+  function ensureScrapyardPattern() {
+    const svg = map.getPanes()?.overlayPane?.querySelector("svg");
+    if (!svg) return;
+
+    let defs = svg.querySelector("defs");
+    if (!defs) {
+      defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      svg.insertBefore(defs, svg.firstChild || null);
+    }
+
+    if (defs.querySelector("#scrapyard-stripes-pattern")) return;
+
+    const pattern = document.createElementNS("http://www.w3.org/2000/svg", "pattern");
+    pattern.setAttribute("id", "scrapyard-stripes-pattern");
+    pattern.setAttribute("patternUnits", "userSpaceOnUse");
+    pattern.setAttribute("width", "38");
+    pattern.setAttribute("height", "38");
+    pattern.setAttribute("patternTransform", "rotate(-25)");
+
+    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    bg.setAttribute("x", "0");
+    bg.setAttribute("y", "0");
+    bg.setAttribute("width", "38");
+    bg.setAttribute("height", "38");
+    bg.setAttribute("fill", "#b9d89a");
+
+    const stripe = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    stripe.setAttribute("x", "0");
+    stripe.setAttribute("y", "0");
+    stripe.setAttribute("width", "16");
+    stripe.setAttribute("height", "38");
+    stripe.setAttribute("fill", "#a5cb74");
+
+    pattern.appendChild(bg);
+    pattern.appendChild(stripe);
+    defs.appendChild(pattern);
   }
 
   function roadStrokeScaleForZoom(zoom) {

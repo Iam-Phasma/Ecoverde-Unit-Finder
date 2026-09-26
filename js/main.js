@@ -1,6 +1,18 @@
 // Bootstraps the map and wires up the search form + layers menu UI.
 import { createMapController } from "./map-controller.js";
 
+const GITHUB_PAGES_HOST_PATTERN = /\.github\.io$/i;
+const GITHUB_PAGES_REPO_PATH = "/Ecoverde-Unit-Finder";
+const VERCEL_HOSTNAME = "ecoverde-unit-finder.vercel.app";
+
+if (GITHUB_PAGES_HOST_PATTERN.test(window.location.hostname)) {
+  const path = window.location.pathname.startsWith(GITHUB_PAGES_REPO_PATH)
+    ? window.location.pathname.slice(GITHUB_PAGES_REPO_PATH.length) || "/"
+    : window.location.pathname || "/";
+  const redirectUrl = `https://${VERCEL_HOSTNAME}${path}${window.location.search}${window.location.hash}`;
+  window.location.replace(redirectUrl);
+}
+
 if ("serviceWorker" in navigator) {
   const registerServiceWorker = () => {
     navigator.serviceWorker

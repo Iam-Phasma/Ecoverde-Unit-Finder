@@ -197,10 +197,11 @@ export function styleForFeature(feature) {
       }
       if (feature.properties.landuse === "industrial") {
         return {
-          color: "#9bad92",
+          color: "#93b368",
           weight: 1,
-          fillColor: "#c7d9bc",
-          fillOpacity: 0.9,
+          fillColor: "#b9d89a",
+          fillOpacity: 1,
+          className: "scrapyard-stripes",
         };
       }
       return {
@@ -275,8 +276,9 @@ export function styleForFeature(feature) {
       };
     case "cityblock":
       return {
-        color: "#d9c7a3",
-        weight: 1,
+        color: "transparent",
+        weight: 0,
+        opacity: 0,
         fillColor: "#efdbb6",
         fillOpacity: 0.9,
         interactive: false,

@@ -60,9 +60,9 @@ const barriersQuery = `
 out geom;
 `;
 
-// A small buffer around the subdivision so the nearby national highway and stream show up
-// for geographic context, without pulling in unrelated data far from the entrance.
-const CONTEXT_BUFFER_DEG = 0.006;
+// A wider buffer around the subdivision so highway/river context remains visible while
+// panning, even though non-village buildings are not rendered.
+const CONTEXT_BUFFER_DEG = 0.02;
 const CONTEXT_BBOX = {
   minLat: SUBDIVISION_BBOX.minLat - CONTEXT_BUFFER_DEG,
   minLon: SUBDIVISION_BBOX.minLon - CONTEXT_BUFFER_DEG,
