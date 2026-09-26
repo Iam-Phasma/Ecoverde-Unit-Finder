@@ -1,0 +1,4 @@
+.DS_Store
+
+# Temporary response dumps from manual fetch/debug workflows.
+/body*.txt

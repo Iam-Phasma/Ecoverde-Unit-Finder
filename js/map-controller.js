@@ -35,6 +35,10 @@ const ROAD_STYLE_MAX_SCALE = 1.22;
 const TREE_ROUTE_FADE_MAX_PX = 14;
 const ADMIN_PIN_OVERLAP_PX = 26;
 const WHEEL_ZOOM_COOLDOWN_MS = 170;
+const FOREST_CLUMP_COUNT = 24;
+const FOREST_CLUMP_MIN_TREES = 8;
+const FOREST_CLUMP_MAX_TREES = 18;
+const FOREST_HIGHWAY_CLEARANCE_METERS = 42;
 
 function blockageMarkerIconSvg() {
   return '<svg class="avoid-marker-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-4.5 9h9"/></svg>';
@@ -133,6 +137,7 @@ export function createMapController() {
   navControl.addTo(map);
 
   const layers = {
+    forestTrees: L.layerGroup().addTo(map),
     context: L.layerGroup().addTo(map),
     landuse: L.layerGroup().addTo(map),
     leisure: L.layerGroup().addTo(map),
@@ -240,6 +245,7 @@ export function createMapController() {
   }
 
   function renderData(collection) {
+    layers.forestTrees.clearLayers();
     layers.leisureDots.clearLayers();
     layers.roadNames.clearLayers();
     layers.obstacle.clearLayers();
@@ -359,7 +365,14 @@ export function createMapController() {
       }
       group.addLayer(layer);
       if (category === "leisure") {
-        if (!(props.sport === "basketball" || props.surface === "concrete")) {
+        if (props.leisure === "park" || props.leisure === "garden") {
+          addParkCenterShade(layer);
+        }
+        if (
+          !(props.sport === "basketball" || props.surface === "concrete") &&
+          props.leisure !== "garden" &&
+          props.leisure !== "park"
+        ) {
           addLeisureTextureDots(layer);
         }
       }
@@ -397,6 +410,208 @@ export function createMapController() {
     updateAdministrativeClusters();
     applyRoadStrokeScale();
     refreshRoadNameLabels();
+    populatePeripheralForest(dataBounds, collection.features);
+  }
+
+  function mulberry32(seed) {
+    let t = seed >>> 0;
+    return () => {
+      t += 0x6d2b79f5;
+      let n = Math.imul(t ^ (t >>> 15), t | 1);
+      n ^= n + Math.imul(n ^ (n >>> 7), n | 61);
+      return ((n ^ (n >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function seedFromBounds(bounds) {
+    const c = bounds.getCenter();
+    const a = Math.round((c.lat + 90) * 100000);
+    const b = Math.round((c.lng + 180) * 100000);
+    const span = Math.round(bounds.getNorth() * 1000 + bounds.getEast() * 1000);
+    return (a * 31 + b * 17 + span * 13) >>> 0;
+  }
+
+  function randomAroundClump(center, latSpan, lngSpan, rnd) {
+    const offsetLat = (rnd() + rnd() + rnd() - 1.5) * latSpan * 0.05;
+    const offsetLng = (rnd() + rnd() + rnd() - 1.5) * lngSpan * 0.05;
+    return L.latLng(center.lat + offsetLat, center.lng + offsetLng);
+  }
+
+  function collectVillageKeepoutPolygons(features) {
+    const polygons = [];
+    if (!Array.isArray(features)) return polygons;
+
+    for (const feature of features) {
+      const props = feature?.properties || {};
+      const category = props.category;
+      if (
+        category !== "building" &&
+        category !== "cityblock" &&
+        category !== "landuse" &&
+        category !== "leisure"
+      ) {
+        continue;
+      }
+
+      const geom = feature?.geometry;
+      if (!geom) continue;
+
+      if (geom.type === "Polygon" && Array.isArray(geom.coordinates?.[0])) {
+        polygons.push(geom.coordinates[0].map(([lng, lat]) => [lat, lng]));
+      } else if (geom.type === "MultiPolygon" && Array.isArray(geom.coordinates)) {
+        for (const poly of geom.coordinates) {
+          if (!Array.isArray(poly?.[0])) continue;
+          polygons.push(poly[0].map(([lng, lat]) => [lat, lng]));
+        }
+      }
+    }
+
+    return polygons;
+  }
+
+  function collectHighwaySegments(features) {
+    const segments = [];
+    if (!Array.isArray(features)) return segments;
+
+    const addLineSegments = (coords) => {
+      if (!Array.isArray(coords) || coords.length < 2) return;
+      for (let i = 0; i < coords.length - 1; i++) {
+        const [lngA, latA] = coords[i];
+        const [lngB, latB] = coords[i + 1];
+        segments.push([
+          L.latLng(latA, lngA),
+          L.latLng(latB, lngB),
+        ]);
+      }
+    };
+
+    for (const feature of features) {
+      const props = feature?.properties || {};
+      const category = props.category;
+      const isHighway =
+        category === "context-road" ||
+        (category === "road" && String(props.highway || "").toLowerCase() === "primary");
+      if (!isHighway) continue;
+
+      const geom = feature?.geometry;
+      if (!geom) continue;
+      if (geom.type === "LineString") {
+        addLineSegments(geom.coordinates);
+      } else if (geom.type === "MultiLineString" && Array.isArray(geom.coordinates)) {
+        for (const line of geom.coordinates) addLineSegments(line);
+      }
+    }
+
+    return segments;
+  }
+
+  function pointToSegmentDistanceMeters(point, a, b) {
+    const refLatRad = (point.lat * Math.PI) / 180;
+    const metersPerDegLat = 111320;
+    const metersPerDegLng = Math.max(1, Math.cos(refLatRad) * 111320);
+
+    const px = point.lng * metersPerDegLng;
+    const py = point.lat * metersPerDegLat;
+    const ax = a.lng * metersPerDegLng;
+    const ay = a.lat * metersPerDegLat;
+    const bx = b.lng * metersPerDegLng;
+    const by = b.lat * metersPerDegLat;
+
+    const abx = bx - ax;
+    const aby = by - ay;
+    const ab2 = abx * abx + aby * aby;
+    if (ab2 === 0) return Math.hypot(px - ax, py - ay);
+
+    const apx = px - ax;
+    const apy = py - ay;
+    const t = Math.max(0, Math.min(1, (apx * abx + apy * aby) / ab2));
+    const cx = ax + abx * t;
+    const cy = ay + aby * t;
+    return Math.hypot(px - cx, py - cy);
+  }
+
+  // Creates non-interactive background forest around (but outside) the village.
+  function populatePeripheralForest(bounds, features = []) {
+    if (!bounds || !bounds.isValid()) return;
+
+    const center = bounds.getCenter();
+    const latSpan = bounds.getNorth() - bounds.getSouth();
+    const lngSpan = bounds.getEast() - bounds.getWest();
+    const rnd = mulberry32(seedFromBounds(bounds));
+    const keepoutPolygons = collectVillageKeepoutPolygons(features);
+    const highwaySegments = collectHighwaySegments(features);
+
+    function insideVillageHalo(point) {
+      const nx = (point.lng - center.lng) / Math.max(lngSpan * 0.58, 1e-9);
+      const ny = (point.lat - center.lat) / Math.max(latSpan * 0.58, 1e-9);
+      return nx * nx + ny * ny < 1;
+    }
+
+    function isInsideVillageGeometry(point) {
+      const sample = [point.lat, point.lng];
+      for (const polygon of keepoutPolygons) {
+        if (polygon.length >= 3 && pointInPolygon(sample, polygon)) return true;
+      }
+      return false;
+    }
+
+    function isNearHighway(point) {
+      for (const [a, b] of highwaySegments) {
+        if (pointToSegmentDistanceMeters(point, a, b) < FOREST_HIGHWAY_CLEARANCE_METERS) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function addForestTree(point) {
+      if (insideVillageHalo(point) || isInsideVillageGeometry(point) || isNearHighway(point)) {
+        return;
+      }
+      const size = 15 + Math.floor(rnd() * 10);
+      const flipped = rnd() > 0.5;
+      layers.forestTrees.addLayer(
+        L.marker(point, {
+          icon: L.divIcon({
+            className: `tree-icon tree-icon--bg${flipped ? " tree-icon--flip" : ""}`,
+            iconSize: [size, size],
+            iconAnchor: [Math.round(size / 2), Math.round(size * 0.9)],
+          }),
+          interactive: false,
+          keyboard: false,
+          zIndexOffset: -700,
+        }),
+      );
+    }
+
+    for (let i = 0; i < FOREST_CLUMP_COUNT; i++) {
+      const angle = rnd() * Math.PI * 2;
+      const radial = 1.08 + rnd() * 0.58;
+      const wobble = 0.84 + rnd() * 0.32;
+      const clumpCenter = L.latLng(
+        center.lat + Math.sin(angle) * (latSpan * 0.5) * radial * wobble,
+        center.lng + Math.cos(angle) * (lngSpan * 0.5) * radial * wobble,
+      );
+
+      const clumpTrees =
+        FOREST_CLUMP_MIN_TREES +
+        Math.floor(rnd() * (FOREST_CLUMP_MAX_TREES - FOREST_CLUMP_MIN_TREES + 1));
+      for (let t = 0; t < clumpTrees; t++) {
+        addForestTree(randomAroundClump(clumpCenter, latSpan, lngSpan, rnd));
+      }
+    }
+
+    // Add a sparse outer halo so clumps blend naturally into the background.
+    const haloTrees = 110;
+    for (let i = 0; i < haloTrees; i++) {
+      const angle = rnd() * Math.PI * 2;
+      const radial = 1.18 + rnd() * 0.72;
+      const point = L.latLng(
+        center.lat + Math.sin(angle) * (latSpan * 0.5) * radial,
+        center.lng + Math.cos(angle) * (lngSpan * 0.5) * radial,
+      );
+      addForestTree(point);
+    }
   }
 
   function ensureScrapyardPattern() {
@@ -826,6 +1041,80 @@ export function createMapController() {
     }
   }
 
+  // Adds a subtle darker middle tone for park polygons, without texture dots.
+  function addParkCenterShade(layer) {
+    const ring = getOuterRingLatLngs(layer);
+    if (!ring || ring.length < 3) return;
+
+    const center = ring.reduce(
+      (acc, p) => ({ lat: acc.lat + p.lat, lng: acc.lng + p.lng }),
+      { lat: 0, lng: 0 },
+    );
+    center.lat /= ring.length;
+    center.lng /= ring.length;
+
+    const innerRingOuter = smoothClosedRing(
+      scaleRingTowardsCenter(ring, center, 0.74),
+      2,
+    );
+    const innerRingCore = smoothClosedRing(
+      scaleRingTowardsCenter(ring, center, 0.52),
+      2,
+    );
+
+    layers.leisure.addLayer(
+      L.polygon(innerRingOuter, {
+        stroke: false,
+        fillColor: "#80b24f",
+        fillOpacity: 0.16,
+        interactive: false,
+        renderer: bakedRenderer,
+      }),
+    );
+
+    layers.leisure.addLayer(
+      L.polygon(innerRingCore, {
+        stroke: false,
+        fillColor: "#74a546",
+        fillOpacity: 0.2,
+        interactive: false,
+        renderer: bakedRenderer,
+      }),
+    );
+  }
+
+  function scaleRingTowardsCenter(ring, center, scale) {
+    return ring.map((p) =>
+      L.latLng(
+        center.lat + (p.lat - center.lat) * scale,
+        center.lng + (p.lng - center.lng) * scale,
+      ),
+    );
+  }
+
+  // Chaikin corner-cutting for a softer rounded polygon silhouette.
+  function smoothClosedRing(ring, iterations = 1) {
+    let points = Array.isArray(ring) ? ring.slice() : [];
+    if (points.length < 3) return points;
+
+    for (let k = 0; k < iterations; k++) {
+      const next = [];
+      for (let i = 0; i < points.length; i++) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        next.push(
+          L.latLng(a.lat * 0.75 + b.lat * 0.25, a.lng * 0.75 + b.lng * 0.25),
+        );
+        next.push(
+          L.latLng(a.lat * 0.25 + b.lat * 0.75, a.lng * 0.25 + b.lng * 0.75),
+        );
+      }
+      points = next;
+    }
+
+    return points;
+  }
+
   function getOuterRingLatLngs(layer) {
     if (!layer.getLatLngs) return null;
     const ll = layer.getLatLngs();
@@ -1035,6 +1324,17 @@ export function createMapController() {
     };
     const layerGroup = mapping[key];
     if (!layerGroup) return;
+
+    if (key === "decoration") {
+      if (visible) {
+        if (!map.hasLayer(layers.pois)) layers.pois.addTo(map);
+        if (!map.hasLayer(layers.forestTrees)) layers.forestTrees.addTo(map);
+      } else {
+        if (map.hasLayer(layers.pois)) map.removeLayer(layers.pois);
+        if (map.hasLayer(layers.forestTrees)) map.removeLayer(layers.forestTrees);
+      }
+      return;
+    }
 
     if (visible) {
       if (!map.hasLayer(layerGroup)) layerGroup.addTo(map);
