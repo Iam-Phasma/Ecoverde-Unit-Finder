@@ -20,14 +20,23 @@ function roadWeight(props) {
   return Number.isFinite(lanes) ? Math.min(3 + lanes * 1.5, 10) : 7;
 }
 
-/** A wider, solid underlay drawn before the road fill so intersections join cleanly (no blurred CSS filters). */
-export function roadCasingStyle(props) {
+function scaleStroke(weight, zoomScale) {
+  return Math.max(1, weight * zoomScale);
+}
+
+/** Outermost green verge underlay drawn before the gray outline and road fill. */
+export function roadVergeStyle(props, zoomScale = 1) {
+  return null;
+}
+
+/** Mid gray outline between the road fill and outer green verge. */
+export function roadCasingStyle(props, zoomScale = 1) {
   const hw = props.highway;
   if (WALK_HIGHWAYS.has(hw)) return null;
   if (hw === "primary") {
     return {
-      color: "#666b70",
-      weight: 11.5,
+      color: "#9d9d9d",
+      weight: scaleStroke(11, zoomScale),
       opacity: 1,
       lineCap: "round",
       lineJoin: "round",
@@ -36,21 +45,21 @@ export function roadCasingStyle(props) {
   const fillWeight =
     hw === "service" || hw === "track" ? 3.5 : roadWeight(props);
   return {
-    color: "#d9cdbb",
-    weight: fillWeight + 3,
+    color: "#9d9d9d",
+    weight: scaleStroke(fillWeight + 2.8, zoomScale),
     opacity: 1,
     lineCap: "round",
     lineJoin: "round",
   };
 }
 
-function roadStyle(props) {
+export function roadStyle(props, zoomScale = 1) {
   const hw = props.highway;
 
   if (WALK_HIGHWAYS.has(hw)) {
     return {
-      color: "#b98a4e",
-      weight: 2.5,
+      color: "#8f8b80",
+      weight: scaleStroke(2.5, zoomScale),
       opacity: 0.9,
       dashArray: "1,7",
       lineCap: "round",
@@ -60,8 +69,8 @@ function roadStyle(props) {
 
   if (hw === "service" || hw === "track") {
     return {
-      color: "#efe4cf",
-      weight: 3.5,
+      color: "#bebebe",
+      weight: scaleStroke(3.5, zoomScale),
       opacity: 1,
       lineCap: "round",
     };
@@ -69,8 +78,8 @@ function roadStyle(props) {
 
   if (hw === "primary") {
     return {
-      color: "#d2d6da",
-      weight: 8,
+      color: "#bebebe",
+      weight: scaleStroke(8, zoomScale),
       opacity: 1,
       lineCap: "round",
       lineJoin: "round",
@@ -79,19 +88,19 @@ function roadStyle(props) {
 
   // car roads (residential, unclassified, etc.)
   return {
-    color: "#ffffff",
-    weight: roadWeight(props),
+    color: "#bebebe",
+    weight: scaleStroke(roadWeight(props), zoomScale),
     opacity: 1,
     lineCap: "round",
     lineJoin: "round",
   };
 }
 
-export function roadCenterlineStyle(props) {
+export function roadCenterlineStyle(props, zoomScale = 1) {
   if (props.highway !== "primary") return null;
   return {
     color: "#f2cb3d",
-    weight: 2.2,
+    weight: scaleStroke(2.2, zoomScale),
     opacity: 1,
     dashArray: "10,10",
     lineCap: "round",
@@ -116,6 +125,28 @@ export function contextRoadCenterlineStyle() {
     weight: 2,
     opacity: 0.95,
     dashArray: "11,10",
+    lineCap: "round",
+    lineJoin: "round",
+    interactive: false,
+  };
+}
+
+export function contextWaterEdgeStyle() {
+  return {
+    color: "#8dcfeb",
+    weight: 8,
+    opacity: 0.95,
+    lineCap: "round",
+    lineJoin: "round",
+    interactive: false,
+  };
+}
+
+export function contextWaterCoreStyle() {
+  return {
+    color: "#64c1ea",
+    weight: 4.8,
+    opacity: 0.98,
     lineCap: "round",
     lineJoin: "round",
     interactive: false,
@@ -153,10 +184,30 @@ export function styleForFeature(feature) {
     case "barrier":
       return barrierStyle(feature.properties);
     case "landuse":
+      if (
+        feature.properties.landuse === "grass" ||
+        feature.properties.landuse === "grassland"
+      ) {
+        return {
+          color: "#5f8f4c",
+          weight: 1,
+          fillColor: "#7fb769",
+          fillOpacity: 0.94,
+        };
+      }
+      if (feature.properties.landuse === "industrial") {
+        return {
+          color: "#93b368",
+          weight: 1,
+          fillColor: "#b9d89a",
+          fillOpacity: 1,
+          className: "scrapyard-stripes",
+        };
+      }
       return {
-        color: "#b7ceac",
+        color: "#9db99a",
         weight: 1,
-        fillColor: "#cfe3c7",
+        fillColor: "#c6dbc0",
         fillOpacity: 0.9,
       };
     case "leisure":
@@ -169,6 +220,18 @@ export function styleForFeature(feature) {
           weight: 1,
           fillColor: "#c9c5bc",
           fillOpacity: 0.95,
+        };
+      }
+      if (
+        feature.properties.leisure === "garden" ||
+        feature.properties.leisure === "park"
+      ) {
+        return {
+          color: "#92bc58",
+          weight: 0,
+          opacity: 0,
+          fillColor: "#92bc58",
+          fillOpacity: 0.94,
         };
       }
       return {
@@ -190,6 +253,14 @@ export function styleForFeature(feature) {
           fillOpacity: 0.9,
         };
       }
+      if (feature.properties.natural === "grassland") {
+        return {
+          color: "#598845",
+          weight: 1,
+          fillColor: "#74ad61",
+          fillOpacity: 0.94,
+        };
+      }
       return {
         color: "#9fc98f",
         weight: 1,
@@ -198,16 +269,18 @@ export function styleForFeature(feature) {
       };
     case "building":
       return {
-        color: "#c3b49c",
+        color: "#b9935f",
         weight: 1,
-        fillColor: "#d9cdbb",
+        fillColor: "#e4cb9e",
         fillOpacity: 0.95,
       };
     case "cityblock":
       return {
+        color: "transparent",
         weight: 0,
         opacity: 0,
-        fill: false,
+        fillColor: "#efdbb6",
+        fillOpacity: 0.9,
         interactive: false,
       };
     case "context-road":
@@ -221,20 +294,19 @@ export function styleForFeature(feature) {
       };
     case "context-water":
       return {
-        color: "#6fa8c9",
-        weight: 2,
-        opacity: 0.55,
-        dashArray: "1,4",
+        color: "transparent",
+        weight: 0,
+        opacity: 0,
         lineCap: "round",
         interactive: false,
       };
     case "poi-tree":
       return {
-        color: "#b7cf63",
+        color: "#5f8d47",
         weight: 0,
         opacity: 1,
-        fillColor: "#b7cf63",
-        fillOpacity: 0.58,
+        fillColor: "#5f8d47",
+        fillOpacity: 0.7,
       };
     case "poi-shop":
     case "poi-amenity":
@@ -258,35 +330,39 @@ export function styleForFeature(feature) {
 }
 
 export function pointToLayer(feature, latlng) {
+  function treeVariantFromLatLng(point) {
+    // Stable pseudo-random seed from coordinates so variants stay consistent.
+    const latSeed = Math.round((point.lat + 90) * 100000);
+    const lngSeed = Math.round((point.lng + 180) * 100000);
+    const seed = Math.abs((latSeed * 31 + lngSeed * 17) ^ (latSeed * 13));
+
+    const sizes = [20, 24, 29];
+    const size = sizes[seed % sizes.length];
+    const flipped = ((seed >> 2) & 1) === 1;
+    return { size, flipped };
+  }
+
   const colors = {
     "poi-shop": "#c9622a",
     "poi-amenity": "#2f7d4f",
     "poi-office": "#3a5fcd",
     "poi-leisure": "#2f7d4f",
-    "poi-tree": "#7fbf7f",
+    "poi-tree": "#5f8d47",
   };
   const color = colors[feature.properties.category] || "#555";
   // Keep only actual OSM tree points visible. Hide other POI point markers.
   if (feature.properties && feature.properties.category === "poi-tree") {
-    const outer = L.circleMarker(latlng, {
-      radius: 8,
-      color: "#b7cf63",
-      weight: 0,
-      opacity: 1,
-      fillColor: "#b7cf63",
-      fillOpacity: 0.58,
-      interactive: false,
-    });
-    const core = L.marker(latlng, {
+    const { size, flipped } = treeVariantFromLatLng(latlng);
+    return L.marker(latlng, {
       icon: L.divIcon({
-        className: "tree-center-dot",
-        iconSize: [4, 4],
-        iconAnchor: [2, 2],
+        className: `tree-icon${flipped ? " tree-icon--flip" : ""}`,
+        iconSize: [size, size],
+        iconAnchor: [Math.round(size / 2), Math.round(size * 0.9)],
       }),
       interactive: false,
       keyboard: false,
+      zIndexOffset: -100,
     });
-    return L.featureGroup([outer, core]);
   }
 
   if (feature.properties && typeof feature.properties.category === "string" && feature.properties.category.startsWith("poi-")) {

@@ -1,5 +1,5 @@
 :root {
-  --bg: #f3ede2;
+  --bg: #b5d08f;
   --road: #ffffff;
   --road-line: #e7dcc9;
   --building: #d9cdbb;
@@ -219,11 +219,27 @@ main {
   stroke-linecap: round;
 }
 
-.tree-center-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #8daa45;
+.scrapyard-stripes {
+  fill: url(#scrapyard-stripes-pattern) !important;
+  fill-opacity: 1 !important;
+}
+
+.tree-icon {
+  background-image: url("./tree.svg");
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center bottom;
+  transform-origin: center bottom;
+  filter: drop-shadow(0 5px 6px rgba(44, 68, 25, 0.22));
+  transition: opacity 0.2s ease;
+}
+
+.tree-icon--flip {
+  transform: scaleX(-1);
+}
+
+.tree-icon--faded {
+  opacity: 0.35;
 }
 
 .road-name-label {
@@ -253,6 +269,15 @@ main {
   width: 16px;
   height: 16px;
   display: block;
+}
+
+.admin-pin-badge--cluster {
+  border-color: #4f8f67;
+  color: #2e5f44;
+  background: #f4fff7;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 .obstacle-pin {
