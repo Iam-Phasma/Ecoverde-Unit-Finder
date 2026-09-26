@@ -15,13 +15,60 @@ export function groupForCategory(category) {
   return "buildings";
 }
 
-function roadWeight(props) {
-  const lanes = parseInt(props.lanes, 10);
-  return Number.isFinite(lanes) ? Math.min(3 + lanes * 1.5, 10) : 7;
+const WEB_MERCATOR_METERS_PER_PIXEL_AT_Z0 = 156543.03392;
+const ROAD_STYLE_REFERENCE_ZOOM = 17;
+const ROAD_STYLE_REFERENCE_LAT = 14.5;
+
+function roadTravelWidthMeters(props) {
+  const hw = String(props?.highway || "").toLowerCase();
+  const lanes = parseInt(props?.lanes, 10);
+
+  if (WALK_HIGHWAYS.has(hw)) return 0.62;
+  if (hw === "track") return 1.5;
+  if (hw === "service") return 1.9;
+  if (hw === "primary") return 4.2;
+  if (Number.isFinite(lanes)) {
+    const laneCount = Math.max(1, Math.min(6, lanes));
+    return laneCount * 1.25 + 0.28;
+  }
+  return 2.5;
 }
 
-function scaleStroke(weight, zoomScale) {
-  return Math.max(1, weight * zoomScale);
+function normalizeRoadStyleContext(context) {
+  if (typeof context === "number") {
+    return { zoom: ROAD_STYLE_REFERENCE_ZOOM, lat: ROAD_STYLE_REFERENCE_LAT, zoomScale: context };
+  }
+  return {
+    zoom: Number.isFinite(context?.zoom) ? context.zoom : ROAD_STYLE_REFERENCE_ZOOM,
+    lat: Number.isFinite(context?.lat) ? context.lat : ROAD_STYLE_REFERENCE_LAT,
+    zoomScale: Number.isFinite(context?.zoomScale) ? context.zoomScale : null,
+  };
+}
+
+function metersPerPixel(zoom, lat) {
+  const latRad = (Math.max(-85, Math.min(85, lat)) * Math.PI) / 180;
+  return (WEB_MERCATOR_METERS_PER_PIXEL_AT_Z0 * Math.cos(latRad)) / Math.pow(2, zoom);
+}
+
+function metersToPixels(widthMeters, context, minPixels = 1) {
+  const c = normalizeRoadStyleContext(context);
+  if (c.zoomScale !== null) return Math.max(minPixels, widthMeters * c.zoomScale);
+  const mpp = metersPerPixel(c.zoom, c.lat);
+  return Math.max(minPixels, widthMeters / Math.max(mpp, 1e-9));
+}
+
+function contextRoadTravelWidthMeters(props) {
+  const hw = String(props?.highway || "").toLowerCase();
+  if (hw === "primary") return 8.4;
+  if (hw === "secondary") return 7.0;
+  return 6.2;
+}
+
+function contextWaterCoreWidthMeters(props) {
+  const waterway = String(props?.waterway || "").toLowerCase();
+  if (waterway === "river") return 5.4;
+  if (waterway === "stream") return 4.8;
+  return 6.8;
 }
 
 /** Outermost green verge underlay drawn before the gray outline and road fill. */
@@ -30,47 +77,55 @@ export function roadVergeStyle(props, zoomScale = 1) {
 }
 
 /** Mid gray outline between the road fill and outer green verge. */
-export function roadCasingStyle(props, zoomScale = 1) {
+export function roadCasingStyle(props, styleContext) {
   const hw = props.highway;
-  if (WALK_HIGHWAYS.has(hw)) return null;
+  if (WALK_HIGHWAYS.has(hw)) {
+    const walkMeters = roadTravelWidthMeters(props);
+    return {
+      color: "#9d9d9d",
+      weight: metersToPixels(walkMeters + 0.28, styleContext, 0.72),
+      opacity: 0.82,
+      lineCap: "round",
+      lineJoin: "round",
+    };
+  }
+  const carriageMeters = roadTravelWidthMeters(props);
+  const casingMeters = carriageMeters + (hw === "primary" ? 1.6 : 0.9);
   if (hw === "primary") {
     return {
       color: "#9d9d9d",
-      weight: scaleStroke(11, zoomScale),
+      weight: metersToPixels(casingMeters, styleContext, 0.7),
       opacity: 1,
       lineCap: "round",
       lineJoin: "round",
     };
   }
-  const fillWeight =
-    hw === "service" || hw === "track" ? 3.5 : roadWeight(props);
   return {
     color: "#9d9d9d",
-    weight: scaleStroke(fillWeight + 2.8, zoomScale),
+    weight: metersToPixels(casingMeters, styleContext, 0.7),
     opacity: 1,
     lineCap: "round",
     lineJoin: "round",
   };
 }
 
-export function roadStyle(props, zoomScale = 1) {
+export function roadStyle(props, styleContext) {
   const hw = props.highway;
 
   if (WALK_HIGHWAYS.has(hw)) {
     return {
-      color: "#8f8b80",
-      weight: scaleStroke(2.5, zoomScale),
-      opacity: 0.9,
-      dashArray: "1,7",
+      color: "#bebebe",
+      weight: metersToPixels(roadTravelWidthMeters(props), styleContext, 0.6),
+      opacity: 0.98,
       lineCap: "round",
-      className: "road-path",
+      lineJoin: "round",
     };
   }
 
   if (hw === "service" || hw === "track") {
     return {
       color: "#bebebe",
-      weight: scaleStroke(3.5, zoomScale),
+      weight: metersToPixels(roadTravelWidthMeters(props), styleContext, 0.65),
       opacity: 1,
       lineCap: "round",
     };
@@ -79,7 +134,7 @@ export function roadStyle(props, zoomScale = 1) {
   if (hw === "primary") {
     return {
       color: "#bebebe",
-      weight: scaleStroke(8, zoomScale),
+      weight: metersToPixels(roadTravelWidthMeters(props), styleContext, 0.8),
       opacity: 1,
       lineCap: "round",
       lineJoin: "round",
@@ -89,18 +144,18 @@ export function roadStyle(props, zoomScale = 1) {
   // car roads (residential, unclassified, etc.)
   return {
     color: "#bebebe",
-    weight: scaleStroke(roadWeight(props), zoomScale),
+    weight: metersToPixels(roadTravelWidthMeters(props), styleContext, 0.7),
     opacity: 1,
     lineCap: "round",
     lineJoin: "round",
   };
 }
 
-export function roadCenterlineStyle(props, zoomScale = 1) {
+export function roadCenterlineStyle(props, styleContext) {
   if (props.highway !== "primary") return null;
   return {
     color: "#f2cb3d",
-    weight: scaleStroke(2.2, zoomScale),
+    weight: metersToPixels(0.1, styleContext, 0.65),
     opacity: 1,
     dashArray: "10,10",
     lineCap: "round",
@@ -108,10 +163,10 @@ export function roadCenterlineStyle(props, zoomScale = 1) {
   };
 }
 
-export function contextRoadCasingStyle() {
+export function contextRoadStyle(props, styleContext) {
   return {
     color: "#60656c",
-    weight: 9,
+    weight: metersToPixels(contextRoadTravelWidthMeters(props), styleContext, 0.9),
     opacity: 1,
     lineCap: "round",
     lineJoin: "round",
@@ -119,10 +174,26 @@ export function contextRoadCasingStyle() {
   };
 }
 
-export function contextRoadCenterlineStyle() {
+export function contextRoadCasingStyle(props, styleContext) {
+  const hw = String(props?.highway || "").toLowerCase();
+  const baseMeters = contextRoadTravelWidthMeters(props);
+  const casingMeters = baseMeters + (hw === "primary" ? 2.1 : 1.7);
+  return {
+    color: "#bdbdbd",
+    weight: metersToPixels(casingMeters, styleContext, 1),
+    opacity: 1,
+    lineCap: "round",
+    lineJoin: "round",
+    interactive: false,
+  };
+}
+
+export function contextRoadCenterlineStyle(props, styleContext) {
+  const hw = String(props?.highway || "").toLowerCase();
+  const centerMeters = hw === "primary" ? 0.2 : 0.14;
   return {
     color: "#f2cb3d",
-    weight: 2,
+    weight: metersToPixels(centerMeters, styleContext, 0.65),
     opacity: 0.95,
     dashArray: "11,10",
     lineCap: "round",
@@ -131,10 +202,12 @@ export function contextRoadCenterlineStyle() {
   };
 }
 
-export function contextWaterEdgeStyle() {
+export function contextWaterEdgeStyle(props, styleContext) {
+  const coreMeters = contextWaterCoreWidthMeters(props);
+  const edgeMeters = coreMeters + 2.8;
   return {
     color: "#8dcfeb",
-    weight: 8,
+    weight: metersToPixels(edgeMeters, styleContext, 0.9),
     opacity: 0.95,
     lineCap: "round",
     lineJoin: "round",
@@ -142,10 +215,11 @@ export function contextWaterEdgeStyle() {
   };
 }
 
-export function contextWaterCoreStyle() {
+export function contextWaterCoreStyle(props, styleContext) {
+  const coreMeters = contextWaterCoreWidthMeters(props);
   return {
     color: "#64c1ea",
-    weight: 4.8,
+    weight: metersToPixels(coreMeters, styleContext, 0.7),
     opacity: 0.98,
     lineCap: "round",
     lineJoin: "round",
@@ -181,6 +255,15 @@ export function styleForFeature(feature) {
   switch (c) {
     case "road":
       return roadStyle(feature.properties);
+    case "context-road":
+      return contextRoadStyle(feature.properties);
+    case "context-water":
+      return {
+        color: "transparent",
+        weight: 0,
+        opacity: 0,
+        interactive: false,
+      };
     case "barrier":
       return barrierStyle(feature.properties);
     case "landuse":
@@ -336,10 +419,27 @@ export function pointToLayer(feature, latlng) {
     const lngSeed = Math.round((point.lng + 180) * 100000);
     const seed = Math.abs((latSeed * 31 + lngSeed * 17) ^ (latSeed * 13));
 
-    const sizes = [20, 24, 29];
-    const size = sizes[seed % sizes.length];
+    const sizeMetersSet = [4.2, 5.1, 6.0];
+    const rotations = [
+      "tree-icon--rot-neg30",
+      "tree-icon--rot-neg24",
+      "tree-icon--rot-neg18",
+      "tree-icon--rot-neg12",
+      "tree-icon--rot-neg6",
+      "tree-icon--rot-6",
+      "tree-icon--rot-12",
+      "tree-icon--rot-18",
+      "tree-icon--rot-24",
+      "tree-icon--rot-30",
+    ];
+    const sizeMeters = sizeMetersSet[seed % sizeMetersSet.length];
+    const size = Math.round(
+      metersToPixels(sizeMeters, { zoom: 19, lat: point.lat }, 8),
+    );
     const flipped = ((seed >> 2) & 1) === 1;
-    return { size, flipped };
+    const assetClass = "tree-icon--asset2";
+    const rotationClass = rotations[Math.floor(Math.random() * rotations.length)];
+    return { size, sizeMeters, flipped, assetClass, rotationClass };
   }
 
   const colors = {
@@ -352,10 +452,11 @@ export function pointToLayer(feature, latlng) {
   const color = colors[feature.properties.category] || "#555";
   // Keep only actual OSM tree points visible. Hide other POI point markers.
   if (feature.properties && feature.properties.category === "poi-tree") {
-    const { size, flipped } = treeVariantFromLatLng(latlng);
-    return L.marker(latlng, {
+    const { size, sizeMeters, flipped, assetClass, rotationClass } = treeVariantFromLatLng(latlng);
+    const marker = L.marker(latlng, {
       icon: L.divIcon({
-        className: `tree-icon${flipped ? " tree-icon--flip" : ""}`,
+        className: "tree-icon",
+        html: `<span class="tree-icon__glyph ${assetClass} ${rotationClass}${flipped ? " tree-icon--flip" : ""}"></span>`,
         iconSize: [size, size],
         iconAnchor: [Math.round(size / 2), Math.round(size * 0.9)],
       }),
@@ -363,6 +464,15 @@ export function pointToLayer(feature, latlng) {
       keyboard: false,
       zIndexOffset: -100,
     });
+    marker._treeVariant = {
+      sizeMeters,
+      assetClass,
+      rotationClass,
+      flipped,
+      isBackground: false,
+    };
+    marker._treePixelSize = size;
+    return marker;
   }
 
   if (feature.properties && typeof feature.properties.category === "string" && feature.properties.category.startsWith("poi-")) {

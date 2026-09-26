@@ -16,7 +16,7 @@ if (GITHUB_PAGES_HOST_PATTERN.test(window.location.hostname)) {
 if ("serviceWorker" in navigator) {
   const registerServiceWorker = () => {
     navigator.serviceWorker
-      .register("sw.js")
+      .register("sw.js", { updateViaCache: "none" })
       .catch((err) => console.warn("Service worker registration failed", err));
   };
 

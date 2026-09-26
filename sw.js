@@ -1,5 +1,5 @@
-const STATIC_CACHE = "ecoverde-static-v3";
-const RUNTIME_CACHE = "ecoverde-runtime-v3";
+const STATIC_CACHE = "ecoverde-static-v4";
+const RUNTIME_CACHE = "ecoverde-runtime-v4";
 
 const PRECACHE_URLS = [
   "./",
@@ -49,7 +49,16 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (request.destination === "script" || request.destination === "style" || request.destination === "image" || request.destination === "document") {
+  if (
+    request.destination === "script" ||
+    request.destination === "style" ||
+    request.destination === "document"
+  ) {
+    event.respondWith(networkFirstAsset(request));
+    return;
+  }
+
+  if (request.destination === "image") {
     event.respondWith(cacheFirst(request));
   }
 });
@@ -75,6 +84,19 @@ async function staleWhileRevalidate(request) {
     .catch(() => cached);
 
   return cached || networkPromise;
+}
+
+async function networkFirstAsset(request) {
+  const cache = await caches.open(RUNTIME_CACHE);
+  try {
+    const fresh = await fetch(request, { cache: "no-store" });
+    cache.put(request, fresh.clone());
+    return fresh;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    throw new Error("Asset unavailable");
+  }
 }
 
 async function networkFirstMapData(request) {
