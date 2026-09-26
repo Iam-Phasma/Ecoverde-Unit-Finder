@@ -34,18 +34,54 @@ const ROAD_STYLE_MIN_SCALE = 0.88;
 const ROAD_STYLE_MAX_SCALE = 1.22;
 const TREE_ROUTE_FADE_MAX_PX = 14;
 const ADMIN_PIN_OVERLAP_PX = 26;
+const WHEEL_ZOOM_COOLDOWN_MS = 170;
 
 function blockageMarkerIconSvg() {
   return '<svg class="avoid-marker-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-4.5 9h9"/></svg>';
 }
 
 export function createMapController() {
+  const bakedRenderer = L.canvas({ padding: 1.2 });
   const map = L.map("map", {
     zoomControl: false,
     attributionControl: false,
     minZoom: 15,
     maxZoom: 22,
+    preferCanvas: true,
+    renderer: bakedRenderer,
+    zoomAnimation: true,
+    fadeAnimation: true,
+    markerZoomAnimation: true,
+    zoomSnap: 1,
+    zoomDelta: 1,
+    scrollWheelZoom: false,
   });
+  let lastWheelZoomAt = 0;
+
+  function installSingleStepWheelZoom() {
+    const container = map.getContainer();
+    container.addEventListener(
+      "wheel",
+      (evt) => {
+        if (!evt || typeof evt.deltaY !== "number" || evt.deltaY === 0) return;
+        evt.preventDefault();
+
+        const now = performance.now();
+        if (now - lastWheelZoomAt < WHEEL_ZOOM_COOLDOWN_MS) return;
+        lastWheelZoomAt = now;
+
+        const step = evt.deltaY < 0 ? 1 : -1;
+        const nextZoom = Math.max(
+          map.getMinZoom(),
+          Math.min(map.getMaxZoom(), map.getZoom() + step),
+        );
+        if (nextZoom !== map.getZoom()) map.setZoom(nextZoom);
+      },
+      { passive: false },
+    );
+  }
+
+  installSingleStepWheelZoom();
   const isPhoneViewport = window.matchMedia("(max-width: 720px)");
 
   const navControl = L.control({ position: "bottomright" });
@@ -217,6 +253,7 @@ export function createMapController() {
     const geoJsonLayer = L.geoJSON(collection, {
       style: styleForFeature,
       pointToLayer: pointToLayer,
+      renderer: bakedRenderer,
       onEachFeature: (feature, layer) => {
         const props = feature.properties || {};
 
@@ -239,19 +276,31 @@ export function createMapController() {
           indexRoadEdgeNames(feature);
           const vergeStyle = roadVergeStyle(props, roadStrokeScaleForZoom(map.getZoom()));
           if (vergeStyle) {
-            const vergeLayer = L.polyline(layer.getLatLngs(), vergeStyle);
+            const vergeLayer = L.polyline(layer.getLatLngs(), {
+              ...vergeStyle,
+              renderer: bakedRenderer,
+              noClip: true,
+            });
             vergeLayer.feature = layer.feature;
             layers.roadsVerge.addLayer(vergeLayer);
           }
           const casingStyle = roadCasingStyle(props, roadStrokeScaleForZoom(map.getZoom()));
           if (casingStyle) {
-            const casingLayer = L.polyline(layer.getLatLngs(), casingStyle);
+            const casingLayer = L.polyline(layer.getLatLngs(), {
+              ...casingStyle,
+              renderer: bakedRenderer,
+              noClip: true,
+            });
             casingLayer.feature = layer.feature;
             layers.roadsCasing.addLayer(casingLayer);
           }
           const centerlineStyle = roadCenterlineStyle(props, roadStrokeScaleForZoom(map.getZoom()));
           if (centerlineStyle) {
-            const centerLayer = L.polyline(layer.getLatLngs(), centerlineStyle);
+            const centerLayer = L.polyline(layer.getLatLngs(), {
+              ...centerlineStyle,
+              renderer: bakedRenderer,
+              noClip: true,
+            });
             centerLayer.feature = layer.feature;
             layers.roadsCenter.addLayer(centerLayer);
           }
@@ -262,18 +311,34 @@ export function createMapController() {
         }
         if (props.category === "context-road") {
           layers.contextRoadsCasing.addLayer(
-            L.polyline(layer.getLatLngs(), contextRoadCasingStyle()),
+            L.polyline(layer.getLatLngs(), {
+              ...contextRoadCasingStyle(),
+              renderer: bakedRenderer,
+              noClip: true,
+            }),
           );
           layers.contextRoadsCenter.addLayer(
-            L.polyline(layer.getLatLngs(), contextRoadCenterlineStyle()),
+            L.polyline(layer.getLatLngs(), {
+              ...contextRoadCenterlineStyle(),
+              renderer: bakedRenderer,
+              noClip: true,
+            }),
           );
         }
         if (props.category === "context-water") {
           layers.contextWaterEdge.addLayer(
-            L.polyline(layer.getLatLngs(), contextWaterEdgeStyle()),
+            L.polyline(layer.getLatLngs(), {
+              ...contextWaterEdgeStyle(),
+              renderer: bakedRenderer,
+              noClip: true,
+            }),
           );
           layers.contextWaterCore.addLayer(
-            L.polyline(layer.getLatLngs(), contextWaterCoreStyle()),
+            L.polyline(layer.getLatLngs(), {
+              ...contextWaterCoreStyle(),
+              renderer: bakedRenderer,
+              noClip: true,
+            }),
           );
         }
       },
