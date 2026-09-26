@@ -22,6 +22,15 @@ const nodes = new Map(); // id -> [lon, lat]
 const ways = new Map(); // id -> element
 const relations = [];
 
+// Ecoverde Homes neighbourhood bbox (from Nominatim), used to constrain
+// selected feature types to the village footprint.
+const SUBDIVISION_BBOX = {
+  minLat: 13.8640792,
+  maxLat: 13.8678693,
+  minLon: 121.202926,
+  maxLon: 121.2072337,
+};
+
 for (const el of raw.elements) {
   if (el.type === "node") nodes.set(el.id, [el.lon, el.lat]);
   else if (el.type === "way") ways.set(el.id, el);
@@ -37,6 +46,15 @@ function isClosed(coords) {
   const [x1, y1] = coords[0];
   const [x2, y2] = coords[coords.length - 1];
   return x1 === x2 && y1 === y2;
+}
+
+function isPointInsideSubdivision(lon, lat) {
+  return (
+    lon >= SUBDIVISION_BBOX.minLon &&
+    lon <= SUBDIVISION_BBOX.maxLon &&
+    lat >= SUBDIVISION_BBOX.minLat &&
+    lat <= SUBDIVISION_BBOX.maxLat
+  );
 }
 
 /** Parses a "B18 L16" style name into { block, lot }. */
@@ -110,21 +128,13 @@ for (const el of raw.elements) {
           ? "poi-leisure"
           : null;
   if (!category) continue;
+  if (category === "poi-tree" && !isPointInsideSubdivision(el.lon, el.lat)) continue;
   features.push({
     type: "Feature",
     properties: { category, ...tags },
     geometry: { type: "Point", coordinates: [el.lon, el.lat] },
   });
 }
-
-// Ecoverde Homes neighbourhood bbox (from Nominatim), used to exclude barriers
-// that belong to unrelated compounds picked up by the wider bbox query.
-const SUBDIVISION_BBOX = {
-  minLat: 13.8640792,
-  maxLat: 13.8678693,
-  minLon: 121.202926,
-  maxLon: 121.2072337,
-};
 
 function isInsideSubdivision(coords) {
   return coords.every(

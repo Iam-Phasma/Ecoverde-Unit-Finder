@@ -8,7 +8,11 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+const OVERPASS_URLS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://lz4.overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+];
 const RELATION_ID = 20433499;
 
 // Same bbox used by build-geojson.js to filter unrelated barriers picked up
@@ -19,6 +23,7 @@ const SUBDIVISION_BBOX = {
   maxLat: 13.8678693,
   maxLon: 121.2072337,
 };
+
 
 const mainQuery = `
 [out:json][timeout:60];
@@ -75,29 +80,50 @@ out geom;
 `;
 
 async function runQuery(query) {
-  const res = await fetch(OVERPASS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json,*/*",
-      "User-Agent": "Ecoverde-Unit-Finder/1.0 (local dev data refresh)",
-    },
-    body: `data=${encodeURIComponent(query)}`,
-  });
-  if (!res.ok) {
-    throw new Error(`Overpass request failed: ${res.status} ${await res.text()}`);
+  let lastError = null;
+
+  for (const url of OVERPASS_URLS) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json,*/*",
+            "User-Agent": "Ecoverde-Unit-Finder/1.0 (local dev data refresh)",
+          },
+          body: `data=${encodeURIComponent(query)}`,
+        });
+        if (!res.ok) {
+          const body = await res.text();
+          throw new Error(`Overpass request failed: ${res.status} ${body}`);
+        }
+        return res.json();
+      } catch (err) {
+        lastError = err;
+        console.warn(
+          `Overpass query failed on ${url} (attempt ${attempt}/2): ${err.message}`,
+        );
+      }
+    }
   }
-  return res.json();
+
+  throw lastError || new Error("Overpass request failed on all endpoints");
 }
 
 async function main() {
   console.log("Fetching subdivision data from Overpass (relation", RELATION_ID, ")...");
-  const mainData = await runQuery(mainQuery);
+  const mergedMainData = await runQuery(mainQuery);
+
   fs.writeFileSync(
     path.join(__dirname, "..", "data", "ecoverde-raw.json"),
-    JSON.stringify(mainData),
+    JSON.stringify(mergedMainData),
   );
-  console.log("Wrote data/ecoverde-raw.json (", mainData.elements.length, "elements)");
+  console.log(
+    "Wrote data/ecoverde-raw.json (",
+    mergedMainData.elements.length,
+    "elements)",
+  );
 
   console.log("Fetching perimeter wall/fence bbox...");
   const barriers = await runQuery(barriersQuery);

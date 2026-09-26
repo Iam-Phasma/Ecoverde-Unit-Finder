@@ -1,5 +1,5 @@
-const STATIC_CACHE = "ecoverde-static-v1";
-const RUNTIME_CACHE = "ecoverde-runtime-v1";
+const STATIC_CACHE = "ecoverde-static-v3";
+const RUNTIME_CACHE = "ecoverde-runtime-v3";
 
 const PRECACHE_URLS = [
   "./",

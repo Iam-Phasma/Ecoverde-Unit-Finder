@@ -12,10 +12,14 @@ import {
 import {
   contextRoadCasingStyle,
   contextRoadCenterlineStyle,
+  contextWaterCoreStyle,
+  contextWaterEdgeStyle,
   groupForCategory,
   pointToLayer,
   roadCasingStyle,
+  roadStyle,
   roadCenterlineStyle,
+  roadVergeStyle,
   styleForFeature,
 } from "./style.js";
 import { escapeHtml, numericCompare } from "./utils.js";
@@ -25,6 +29,11 @@ const MIN_REPOSITION_ROUTE_KM = 0.01;
 const ROAD_TAP_MAX_SNAP_PX = 16;
 const REROUTE_PICK_BANNER_TEXT = "Tap the road segment you want to avoid.";
 const ROUTE_DEBUG_STORAGE_KEY = "ecoverde:route-debug";
+const ROAD_STYLE_BASE_ZOOM = 17;
+const ROAD_STYLE_MIN_SCALE = 0.88;
+const ROAD_STYLE_MAX_SCALE = 1.22;
+const TREE_ROUTE_FADE_MAX_PX = 14;
+const ADMIN_PIN_OVERLAP_PX = 26;
 
 function blockageMarkerIconSvg() {
   return '<svg class="avoid-marker-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-4.5 9h9"/></svg>';
@@ -94,9 +103,12 @@ export function createMapController() {
     leisureDots: L.layerGroup().addTo(map),
     roadNames: L.layerGroup().addTo(map),
     cityBlocks: L.layerGroup().addTo(map),
+    roadsVerge: L.layerGroup().addTo(map),
     roadsCasing: L.layerGroup().addTo(map),
     roads: L.layerGroup().addTo(map),
     roadsCenter: L.layerGroup().addTo(map),
+    contextWaterEdge: L.layerGroup().addTo(map),
+    contextWaterCore: L.layerGroup().addTo(map),
     contextRoadsCasing: L.layerGroup().addTo(map),
     contextRoads: L.layerGroup().addTo(map),
     contextRoadsCenter: L.layerGroup().addTo(map),
@@ -146,6 +158,9 @@ export function createMapController() {
   let panelMode = "route"; // "route" | "block"
   let unitCountByBlock = new Map();
   let routeDebugEnabled = readRouteDebugEnabled();
+  let activeRoutePathLatLngs = null;
+  let administrativeSourceMarkers = [];
+  let administrativeClusterMarkers = [];
 
   // Small console API for debugging route narrative decisions.
   if (typeof window !== "undefined") {
@@ -173,7 +188,12 @@ export function createMapController() {
     beginAvoidRoadPick();
   });
   updateRerouteButtonState();
-  map.on("zoomend", refreshRoadNameLabels);
+  map.on("zoomend", () => {
+    refreshRoadNameLabels();
+    applyRoadStrokeScale();
+    updateTreeRouteOcclusion(activeRoutePathLatLngs);
+    updateAdministrativeClusters();
+  });
 
   function loadData(url) {
     fetch(url, { cache: "no-store" })
@@ -187,6 +207,8 @@ export function createMapController() {
     layers.roadNames.clearLayers();
     layers.obstacle.clearLayers();
     layers.administrative.clearLayers();
+    administrativeSourceMarkers = [];
+    administrativeClusterMarkers = [];
     roadNameByEdge = new Map();
     roadNameCandidates = [];
     const lotsByBlock = new Map(); // block -> Set(lot)
@@ -214,17 +236,23 @@ export function createMapController() {
         }
         if (props.category === "road") {
           indexRoadEdgeNames(feature);
-          const casingStyle = roadCasingStyle(props);
-          if (casingStyle) {
-            layers.roadsCasing.addLayer(
-              L.polyline(layer.getLatLngs(), casingStyle),
-            );
+          const vergeStyle = roadVergeStyle(props, roadStrokeScaleForZoom(map.getZoom()));
+          if (vergeStyle) {
+            const vergeLayer = L.polyline(layer.getLatLngs(), vergeStyle);
+            vergeLayer.feature = layer.feature;
+            layers.roadsVerge.addLayer(vergeLayer);
           }
-          const centerlineStyle = roadCenterlineStyle(props);
+          const casingStyle = roadCasingStyle(props, roadStrokeScaleForZoom(map.getZoom()));
+          if (casingStyle) {
+            const casingLayer = L.polyline(layer.getLatLngs(), casingStyle);
+            casingLayer.feature = layer.feature;
+            layers.roadsCasing.addLayer(casingLayer);
+          }
+          const centerlineStyle = roadCenterlineStyle(props, roadStrokeScaleForZoom(map.getZoom()));
           if (centerlineStyle) {
-            layers.roadsCenter.addLayer(
-              L.polyline(layer.getLatLngs(), centerlineStyle),
-            );
+            const centerLayer = L.polyline(layer.getLatLngs(), centerlineStyle);
+            centerLayer.feature = layer.feature;
+            layers.roadsCenter.addLayer(centerLayer);
           }
           if (props.name) {
             const candidate = createRoadNameCandidate(layer, props.name);
@@ -237,6 +265,14 @@ export function createMapController() {
           );
           layers.contextRoadsCenter.addLayer(
             L.polyline(layer.getLatLngs(), contextRoadCenterlineStyle()),
+          );
+        }
+        if (props.category === "context-water") {
+          layers.contextWaterEdge.addLayer(
+            L.polyline(layer.getLatLngs(), contextWaterEdgeStyle()),
+          );
+          layers.contextWaterCore.addLayer(
+            L.polyline(layer.getLatLngs(), contextWaterCoreStyle()),
           );
         }
       },
@@ -284,7 +320,43 @@ export function createMapController() {
     window.addEventListener("resize", updateMinZoom);
     populateObstaclePins(collection.features);
     populateAdministrativePins(collection.features);
+    updateAdministrativeClusters();
+    applyRoadStrokeScale();
     refreshRoadNameLabels();
+  }
+
+  function roadStrokeScaleForZoom(zoom) {
+    const scaled = 1 + (zoom - ROAD_STYLE_BASE_ZOOM) * 0.06;
+    return Math.min(ROAD_STYLE_MAX_SCALE, Math.max(ROAD_STYLE_MIN_SCALE, scaled));
+  }
+
+  function applyRoadStrokeScale() {
+    const zoomScale = roadStrokeScaleForZoom(map.getZoom());
+
+    layers.roads.eachLayer((layer) => {
+      const props = layer.feature?.properties;
+      if (!props || props.category !== "road" || typeof layer.setStyle !== "function") return;
+      layer.setStyle(roadStyle(props, zoomScale));
+    });
+
+    layers.roadsVerge.eachLayer((layer) => {
+      const props = layer.feature?.properties;
+      if (!props || typeof layer.setStyle !== "function") return;
+      layer.setStyle(roadVergeStyle(props, zoomScale));
+    });
+
+    layers.roadsCasing.eachLayer((layer) => {
+      const props = layer.feature?.properties;
+      if (!props || typeof layer.setStyle !== "function") return;
+      layer.setStyle(roadCasingStyle(props, zoomScale));
+    });
+
+    layers.roadsCenter.eachLayer((layer) => {
+      const props = layer.feature?.properties;
+      if (!props || typeof layer.setStyle !== "function") return;
+      const centerStyle = roadCenterlineStyle(props, zoomScale);
+      if (centerStyle) layer.setStyle(centerStyle);
+    });
   }
 
   function populateObstaclePins(features) {
@@ -378,25 +450,111 @@ export function createMapController() {
     for (const { feature, pin } of bestByType.values()) {
       const latlng = featureCenterLatLng(feature);
       if (!latlng) continue;
-      layers.administrative.addLayer(createAdministrativePin(latlng, pin));
+      const marker = createAdministrativePin(latlng, pin);
+      administrativeSourceMarkers.push(marker);
+      layers.administrative.addLayer(marker);
     }
 
     for (const { feature, pin } of modelUnitPins) {
       const latlng = featureCenterLatLng(feature);
       if (!latlng) continue;
-      layers.administrative.addLayer(createAdministrativePin(latlng, pin));
+      const marker = createAdministrativePin(latlng, pin);
+      administrativeSourceMarkers.push(marker);
+      layers.administrative.addLayer(marker);
     }
 
     for (const { feature, pin } of realEstatePins) {
       const latlng = featureCenterLatLng(feature);
       if (!latlng) continue;
-      layers.administrative.addLayer(createAdministrativePin(latlng, pin));
+      const marker = createAdministrativePin(latlng, pin);
+      administrativeSourceMarkers.push(marker);
+      layers.administrative.addLayer(marker);
     }
 
     for (const { feature, pin } of gazeboPins) {
       const latlng = featureCenterLatLng(feature);
       if (!latlng) continue;
-      layers.administrative.addLayer(createAdministrativePin(latlng, pin));
+      const marker = createAdministrativePin(latlng, pin);
+      administrativeSourceMarkers.push(marker);
+      layers.administrative.addLayer(marker);
+    }
+  }
+
+  function setAdministrativeMarkerVisible(marker, visible) {
+    marker.setOpacity(visible ? 1 : 0);
+    const el = marker.getElement && marker.getElement();
+    if (el) el.style.pointerEvents = visible ? "" : "none";
+  }
+
+  function clearAdministrativeClusterMarkers() {
+    for (const marker of administrativeClusterMarkers) {
+      layers.administrative.removeLayer(marker);
+    }
+    administrativeClusterMarkers = [];
+  }
+
+  function createAdministrativeClusterMarker(latlng, count) {
+    return L.marker(latlng, {
+      icon: L.divIcon({
+        className: "admin-pin admin-pin-cluster",
+        html: `<span class="admin-pin-badge admin-pin-badge--cluster" title="${count} overlapping administrative points">${count}</span>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+      }),
+      interactive: false,
+      keyboard: false,
+    });
+  }
+
+  function updateAdministrativeClusters() {
+    clearAdministrativeClusterMarkers();
+
+    for (const marker of administrativeSourceMarkers) {
+      setAdministrativeMarkerVisible(marker, true);
+    }
+
+    if (!map.hasLayer(layers.administrative) || administrativeSourceMarkers.length < 2) return;
+
+    const points = administrativeSourceMarkers.map((marker) =>
+      map.latLngToContainerPoint(marker.getLatLng()),
+    );
+    const visited = new Array(administrativeSourceMarkers.length).fill(false);
+
+    for (let i = 0; i < administrativeSourceMarkers.length; i++) {
+      if (visited[i]) continue;
+      const stack = [i];
+      visited[i] = true;
+      const groupIndexes = [];
+
+      while (stack.length > 0) {
+        const idx = stack.pop();
+        groupIndexes.push(idx);
+
+        for (let j = 0; j < administrativeSourceMarkers.length; j++) {
+          if (visited[j]) continue;
+          if (points[idx].distanceTo(points[j]) <= ADMIN_PIN_OVERLAP_PX) {
+            visited[j] = true;
+            stack.push(j);
+          }
+        }
+      }
+
+      if (groupIndexes.length < 2) continue;
+
+      let latSum = 0;
+      let lngSum = 0;
+      for (const idx of groupIndexes) {
+        const marker = administrativeSourceMarkers[idx];
+        setAdministrativeMarkerVisible(marker, false);
+        const ll = marker.getLatLng();
+        latSum += ll.lat;
+        lngSum += ll.lng;
+      }
+
+      const center = L.latLng(latSum / groupIndexes.length, lngSum / groupIndexes.length);
+      const clusterMarker = createAdministrativeClusterMarker(center, groupIndexes.length);
+      administrativeClusterMarkers.push(clusterMarker);
+      layers.administrative.addLayer(clusterMarker);
     }
   }
 
@@ -761,6 +919,7 @@ export function createMapController() {
       obstacle: layers.obstacle,
       roadNames: layers.roadNames,
       administrative: layers.administrative,
+      decoration: layers.pois,
     };
     const layerGroup = mapping[key];
     if (!layerGroup) return;
@@ -768,8 +927,10 @@ export function createMapController() {
     if (visible) {
       if (!map.hasLayer(layerGroup)) layerGroup.addTo(map);
       if (key === "roadNames") refreshRoadNameLabels();
+      if (key === "administrative") updateAdministrativeClusters();
     } else if (map.hasLayer(layerGroup)) {
       map.removeLayer(layerGroup);
+      if (key === "administrative") updateAdministrativeClusters();
     }
   }
 
@@ -968,12 +1129,24 @@ export function createMapController() {
       routeAnimId = null;
     }
     layers.route.clearLayers();
+    activeRoutePathLatLngs = null;
+    updateTreeRouteOcclusion(null);
     lastEtaInfo = null;
     if (!preserveAvoidMarker) {
       clearAvoidance();
       avoidMarker = null;
     }
     if (!preservePanel) hideRoutePanel();
+  }
+
+  function showGateMarker() {
+    if (!gateMarker || map.hasLayer(gateMarker)) return;
+    gateMarker.addTo(layers.gate);
+  }
+
+  function hideGateMarker() {
+    if (!gateMarker || !map.hasLayer(gateMarker)) return;
+    layers.gate.removeLayer(gateMarker);
   }
 
   /** Creates the draggable marker for the route's starting point (the subdivision gate). */
@@ -990,7 +1163,7 @@ export function createMapController() {
       draggable: true,
       autoPan: true,
       title: "Drag to move the starting point",
-    }).addTo(layers.gate);
+    });
 
     gateMarker.on("dragend", () => relocateGate(gateMarker.getLatLng()));
   }
@@ -1037,6 +1210,7 @@ export function createMapController() {
   function showRoute(options = {}) {
     const { fromReroute = false } = options;
     if (!activeDest) return;
+    showGateMarker();
     clearRoute({ preservePanel: fromReroute, preserveAvoidMarker: true });
 
     if (fromReroute && avoidedEdgeKeys.size > 0 && avoidMarker) {
@@ -1060,6 +1234,7 @@ export function createMapController() {
         const [lon, lat] = roadGraph.nodes.get(k);
         return L.latLng(lat, lon);
       });
+      activeRoutePathLatLngs = pathLatLngs;
       unsnapPoint(roadGraph, destSnapKey);
       const routeBounds = L.latLngBounds(pathLatLngs);
       if (bounds) routeBounds.extend(bounds);
@@ -1069,7 +1244,10 @@ export function createMapController() {
       animateRoute(pathLatLngs, route.keys, route.distance, destCenter, {
         animatePanel: !fromReroute,
       });
+      updateTreeRouteOcclusion(pathLatLngs);
     } else {
+      activeRoutePathLatLngs = null;
+      updateTreeRouteOcclusion(null);
       if (fromReroute) {
         rerouteBlocked = true;
         hideRoutePanel();
@@ -1084,6 +1262,39 @@ export function createMapController() {
       }
     }
     updateRerouteButtonState();
+  }
+
+  function updateTreeRouteOcclusion(pathLatLngs) {
+    const segmentPoints = [];
+    if (Array.isArray(pathLatLngs) && pathLatLngs.length > 1) {
+      for (let i = 0; i < pathLatLngs.length - 1; i++) {
+        segmentPoints.push([
+          map.latLngToContainerPoint(pathLatLngs[i]),
+          map.latLngToContainerPoint(pathLatLngs[i + 1]),
+        ]);
+      }
+    }
+
+    layers.pois.eachLayer((layer) => {
+      const props = layer.feature?.properties;
+      if (!props || props.category !== "poi-tree" || typeof layer.getLatLng !== "function") return;
+      const el = layer.getElement && layer.getElement();
+      if (!el) return;
+
+      let shouldFade = false;
+      if (segmentPoints.length > 0) {
+        const treePoint = map.latLngToContainerPoint(layer.getLatLng());
+        for (const [a, b] of segmentPoints) {
+          const distPx = L.LineUtil.pointToSegmentDistance(treePoint, a, b);
+          if (distPx <= TREE_ROUTE_FADE_MAX_PX) {
+            shouldFade = true;
+            break;
+          }
+        }
+      }
+
+      el.classList.toggle("tree-icon--faded", shouldFade);
+    });
   }
 
   /** Animates a marker along the route, then updates route details in the corner panel. */
@@ -1681,6 +1892,7 @@ export function createMapController() {
     endAvoidRoadPickMode();
     clearHighlight();
     clearRoute();
+    hideGateMarker();
     clearAvoidance();
     activeDest = null;
     updateRerouteButtonState();
@@ -1799,6 +2011,7 @@ export function createMapController() {
     endAvoidRoadPickMode();
     clearHighlight();
     clearRoute();
+    hideGateMarker();
     activeDest = null;
     clearAvoidance();
     updateRerouteButtonState();
