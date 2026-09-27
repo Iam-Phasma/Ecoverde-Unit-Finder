@@ -424,7 +424,10 @@ export function createMapController() {
       const category = layer.feature.properties.category;
       const props = layer.feature?.properties || {};
       let group = layers[groupForCategory(category)] || layers.buildings;
-      if (category === "road" && WALK_HIGHWAYS.has(String(props.highway || "").toLowerCase())) {
+      if (
+        category === "road" &&
+        WALK_HIGHWAYS.has(String(props.highway || "").toLowerCase())
+      ) {
         group = layers.footpaths;
       }
       if (
@@ -559,7 +562,10 @@ export function createMapController() {
 
       if (geom.type === "Polygon" && Array.isArray(geom.coordinates?.[0])) {
         polygons.push(geom.coordinates[0].map(([lng, lat]) => [lat, lng]));
-      } else if (geom.type === "MultiPolygon" && Array.isArray(geom.coordinates)) {
+      } else if (
+        geom.type === "MultiPolygon" &&
+        Array.isArray(geom.coordinates)
+      ) {
         for (const poly of geom.coordinates) {
           if (!Array.isArray(poly?.[0])) continue;
           polygons.push(poly[0].map(([lng, lat]) => [lat, lng]));
@@ -579,10 +585,7 @@ export function createMapController() {
       for (let i = 0; i < coords.length - 1; i++) {
         const [lngA, latA] = coords[i];
         const [lngB, latB] = coords[i + 1];
-        segments.push([
-          L.latLng(latA, lngA),
-          L.latLng(latB, lngB),
-        ]);
+        segments.push([L.latLng(latA, lngA), L.latLng(latB, lngB)]);
       }
     };
 
@@ -591,14 +594,18 @@ export function createMapController() {
       const category = props.category;
       const isHighway =
         category === "context-road" ||
-        (category === "road" && String(props.highway || "").toLowerCase() === "primary");
+        (category === "road" &&
+          String(props.highway || "").toLowerCase() === "primary");
       if (!isHighway) continue;
 
       const geom = feature?.geometry;
       if (!geom) continue;
       if (geom.type === "LineString") {
         addLineSegments(geom.coordinates);
-      } else if (geom.type === "MultiLineString" && Array.isArray(geom.coordinates)) {
+      } else if (
+        geom.type === "MultiLineString" &&
+        Array.isArray(geom.coordinates)
+      ) {
         for (const line of geom.coordinates) addLineSegments(line);
       }
     }
@@ -615,10 +622,7 @@ export function createMapController() {
       for (let i = 0; i < coords.length - 1; i++) {
         const [lngA, latA] = coords[i];
         const [lngB, latB] = coords[i + 1];
-        segments.push([
-          L.latLng(latA, lngA),
-          L.latLng(latB, lngB),
-        ]);
+        segments.push([L.latLng(latA, lngA), L.latLng(latB, lngB)]);
       }
     };
 
@@ -634,7 +638,10 @@ export function createMapController() {
       if (!geom) continue;
       if (geom.type === "LineString") {
         addLineSegments(geom.coordinates);
-      } else if (geom.type === "MultiLineString" && Array.isArray(geom.coordinates)) {
+      } else if (
+        geom.type === "MultiLineString" &&
+        Array.isArray(geom.coordinates)
+      ) {
         for (const line of geom.coordinates) addLineSegments(line);
       }
     }
@@ -695,7 +702,10 @@ export function createMapController() {
 
     function isNearHighway(point) {
       for (const [a, b] of highwaySegments) {
-        if (pointToSegmentDistanceMeters(point, a, b) < FOREST_HIGHWAY_CLEARANCE_METERS) {
+        if (
+          pointToSegmentDistanceMeters(point, a, b) <
+          FOREST_HIGHWAY_CLEARANCE_METERS
+        ) {
           return true;
         }
       }
@@ -704,7 +714,10 @@ export function createMapController() {
 
     function isNearRiver(point) {
       for (const [a, b] of riverSegments) {
-        if (pointToSegmentDistanceMeters(point, a, b) < FOREST_RIVER_CLEARANCE_METERS) {
+        if (
+          pointToSegmentDistanceMeters(point, a, b) <
+          FOREST_RIVER_CLEARANCE_METERS
+        ) {
           return true;
         }
       }
@@ -721,14 +734,18 @@ export function createMapController() {
         return;
       }
       const sizeMetersSet = [4.1, 5.1, 6.3];
-      const sizeMeters = sizeMetersSet[Math.floor(rnd() * sizeMetersSet.length)];
+      const sizeMeters =
+        sizeMetersSet[Math.floor(rnd() * sizeMetersSet.length)];
       const size = treePixelSizeForMeters(sizeMeters, point.lat);
       const flipped = rnd() > 0.5;
       const assetClass = "tree-icon--asset2";
       const rotationClass =
         TREE_ROTATION_CLASSES[Math.floor(rnd() * TREE_ROTATION_CLASSES.length)];
       const marker = L.marker(point, {
-        icon: buildTreeDivIcon({ assetClass, rotationClass, flipped, isBackground: true }, size),
+        icon: buildTreeDivIcon(
+          { assetClass, rotationClass, flipped, isBackground: true },
+          size,
+        ),
         interactive: false,
         keyboard: false,
         zIndexOffset: -700,
@@ -755,7 +772,9 @@ export function createMapController() {
 
       const clumpTrees =
         FOREST_CLUMP_MIN_TREES +
-        Math.floor(rnd() * (FOREST_CLUMP_MAX_TREES - FOREST_CLUMP_MIN_TREES + 1));
+        Math.floor(
+          rnd() * (FOREST_CLUMP_MAX_TREES - FOREST_CLUMP_MIN_TREES + 1),
+        );
       for (let t = 0; t < clumpTrees; t++) {
         addForestTree(randomAroundClump(clumpCenter, latSpan, lngSpan, rnd));
       }
@@ -786,7 +805,10 @@ export function createMapController() {
 
     if (defs.querySelector("#scrapyard-stripes-pattern")) return;
 
-    const pattern = document.createElementNS("http://www.w3.org/2000/svg", "pattern");
+    const pattern = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "pattern",
+    );
     pattern.setAttribute("id", "scrapyard-stripes-pattern");
     pattern.setAttribute("patternUnits", "userSpaceOnUse");
     pattern.setAttribute("width", "38");
@@ -800,7 +822,10 @@ export function createMapController() {
     bg.setAttribute("height", "38");
     bg.setAttribute("fill", "#b9d89a");
 
-    const stripe = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    const stripe = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "rect",
+    );
     stripe.setAttribute("x", "0");
     stripe.setAttribute("y", "0");
     stripe.setAttribute("width", "16");
@@ -817,7 +842,8 @@ export function createMapController() {
     if (!Number.isFinite(lat)) {
       if (typeof layer?.getBounds === "function") {
         const bounds = layer.getBounds();
-        lat = bounds?.isValid && bounds.isValid() ? bounds.getCenter().lat : null;
+        lat =
+          bounds?.isValid && bounds.isValid() ? bounds.getCenter().lat : null;
       }
     }
     if (!Number.isFinite(lat) && typeof layer?.getLatLng === "function") {
@@ -830,7 +856,10 @@ export function createMapController() {
     const latRad = (Math.max(-85, Math.min(85, lat)) * Math.PI) / 180;
     const metersPerPixel =
       (156543.03392 * Math.cos(latRad)) / Math.pow(2, map.getZoom());
-    return Math.max(TREE_MIN_PIXEL_SIZE, sizeMeters / Math.max(metersPerPixel, 1e-9));
+    return Math.max(
+      TREE_MIN_PIXEL_SIZE,
+      sizeMeters / Math.max(metersPerPixel, 1e-9),
+    );
   }
 
   function scheduleTreeSizeScale() {
@@ -875,7 +904,8 @@ export function createMapController() {
     const markers = [];
     const collect = (group) => {
       group.eachLayer((layer) => {
-        if (!layer?._treeVariant || typeof layer.getLatLng !== "function") return;
+        if (!layer?._treeVariant || typeof layer.getLatLng !== "function")
+          return;
         markers.push(layer);
       });
     };
@@ -898,7 +928,9 @@ export function createMapController() {
       const usedByNeighbors = [];
       for (const prev of placed) {
         const there = prev.getLatLng();
-        if (map.distance(here, there) <= TREE_NEIGHBOR_ROTATION_CLEARANCE_METERS) {
+        if (
+          map.distance(here, there) <= TREE_NEIGHBOR_ROTATION_CLEARANCE_METERS
+        ) {
           usedByNeighbors.push(prev._treeVariant.rotationClass);
         }
       }
@@ -907,7 +939,8 @@ export function createMapController() {
       let chosen = marker._treeVariant.rotationClass;
       let bestScore = rotationDistanceScore(chosen, usedByNeighbors);
       for (let i = 0; i < TREE_ROTATION_CLASSES.length; i++) {
-        const candidate = TREE_ROTATION_CLASSES[(start + i) % TREE_ROTATION_CLASSES.length];
+        const candidate =
+          TREE_ROTATION_CLASSES[(start + i) % TREE_ROTATION_CLASSES.length];
         const score = rotationDistanceScore(candidate, usedByNeighbors);
         if (score > bestScore) {
           chosen = candidate;
@@ -917,7 +950,9 @@ export function createMapController() {
 
       if (marker._treeVariant.rotationClass !== chosen) {
         marker._treeVariant.rotationClass = chosen;
-        const sizePx = marker._treePixelSize || treePixelSizeForMeters(marker._treeVariant.sizeMeters, here.lat);
+        const sizePx =
+          marker._treePixelSize ||
+          treePixelSizeForMeters(marker._treeVariant.sizeMeters, here.lat);
         marker.setIcon(buildTreeDivIcon(marker._treeVariant, sizePx));
         marker._treePixelSize = sizePx;
       }
@@ -942,7 +977,12 @@ export function createMapController() {
     const scaleLayer = (layerGroup) => {
       layerGroup.eachLayer((layer) => {
         const variant = layer?._treeVariant;
-        if (!variant || typeof layer.getLatLng !== "function" || typeof layer.setIcon !== "function") return;
+        if (
+          !variant ||
+          typeof layer.getLatLng !== "function" ||
+          typeof layer.setIcon !== "function"
+        )
+          return;
         const lat = layer.getLatLng()?.lat;
         if (!Number.isFinite(lat)) return;
         const sizePx = treePixelSizeForMeters(variant.sizeMeters, lat);
@@ -972,50 +1012,99 @@ export function createMapController() {
   function applyRoadStrokeScale() {
     layers.contextRoads.eachLayer((layer) => {
       const props = layer.feature?.properties;
-      if (!props || props.category !== "context-road" || typeof layer.setStyle !== "function") return;
+      if (
+        !props ||
+        props.category !== "context-road" ||
+        typeof layer.setStyle !== "function"
+      )
+        return;
       layer.setStyle(contextRoadStyle(props, roadStyleContextForLayer(layer)));
     });
 
     layers.contextRoadsCasing.eachLayer((layer) => {
       const props = layer.feature?.properties;
-      if (!props || props.category !== "context-road" || typeof layer.setStyle !== "function") return;
-      layer.setStyle(contextRoadCasingStyle(props, roadStyleContextForLayer(layer)));
+      if (
+        !props ||
+        props.category !== "context-road" ||
+        typeof layer.setStyle !== "function"
+      )
+        return;
+      layer.setStyle(
+        contextRoadCasingStyle(props, roadStyleContextForLayer(layer)),
+      );
     });
 
     layers.contextRoadsCenter.eachLayer((layer) => {
       const props = layer.feature?.properties;
-      if (!props || props.category !== "context-road" || typeof layer.setStyle !== "function") return;
-      const centerStyle = contextRoadCenterlineStyle(props, roadStyleContextForLayer(layer));
+      if (
+        !props ||
+        props.category !== "context-road" ||
+        typeof layer.setStyle !== "function"
+      )
+        return;
+      const centerStyle = contextRoadCenterlineStyle(
+        props,
+        roadStyleContextForLayer(layer),
+      );
       if (centerStyle) layer.setStyle(centerStyle);
     });
 
     layers.contextWaterEdge.eachLayer((layer) => {
       const props = layer.feature?.properties;
-      if (!props || props.category !== "context-water" || typeof layer.setStyle !== "function") return;
-      layer.setStyle(contextWaterEdgeStyle(props, roadStyleContextForLayer(layer)));
+      if (
+        !props ||
+        props.category !== "context-water" ||
+        typeof layer.setStyle !== "function"
+      )
+        return;
+      layer.setStyle(
+        contextWaterEdgeStyle(props, roadStyleContextForLayer(layer)),
+      );
     });
 
     layers.contextWaterCore.eachLayer((layer) => {
       const props = layer.feature?.properties;
-      if (!props || props.category !== "context-water" || typeof layer.setStyle !== "function") return;
-      layer.setStyle(contextWaterCoreStyle(props, roadStyleContextForLayer(layer)));
+      if (
+        !props ||
+        props.category !== "context-water" ||
+        typeof layer.setStyle !== "function"
+      )
+        return;
+      layer.setStyle(
+        contextWaterCoreStyle(props, roadStyleContextForLayer(layer)),
+      );
     });
 
     layers.footpathsCasing.eachLayer((layer) => {
       const props = layer.feature?.properties;
-      if (!props || props.category !== "road" || typeof layer.setStyle !== "function") return;
+      if (
+        !props ||
+        props.category !== "road" ||
+        typeof layer.setStyle !== "function"
+      )
+        return;
       layer.setStyle(roadCasingStyle(props, roadStyleContextForLayer(layer)));
     });
 
     layers.footpaths.eachLayer((layer) => {
       const props = layer.feature?.properties;
-      if (!props || props.category !== "road" || typeof layer.setStyle !== "function") return;
+      if (
+        !props ||
+        props.category !== "road" ||
+        typeof layer.setStyle !== "function"
+      )
+        return;
       layer.setStyle(roadStyle(props, roadStyleContextForLayer(layer)));
     });
 
     layers.roads.eachLayer((layer) => {
       const props = layer.feature?.properties;
-      if (!props || props.category !== "road" || typeof layer.setStyle !== "function") return;
+      if (
+        !props ||
+        props.category !== "road" ||
+        typeof layer.setStyle !== "function"
+      )
+        return;
       layer.setStyle(roadStyle(props, roadStyleContextForLayer(layer)));
     });
 
@@ -1034,7 +1123,10 @@ export function createMapController() {
     layers.roadsCenter.eachLayer((layer) => {
       const props = layer.feature?.properties;
       if (!props || typeof layer.setStyle !== "function") return;
-      const centerStyle = roadCenterlineStyle(props, roadStyleContextForLayer(layer));
+      const centerStyle = roadCenterlineStyle(
+        props,
+        roadStyleContextForLayer(layer),
+      );
       if (centerStyle) layer.setStyle(centerStyle);
     });
   }
@@ -1072,7 +1164,8 @@ export function createMapController() {
   }
 
   function obstacleIconSvg(type) {
-    const common = 'class="obstacle-pin-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"';
+    const common =
+      'class="obstacle-pin-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"';
     if (type === "noExit") {
       return `<svg ${common}><path stroke="currentColor" stroke-linecap="round" stroke-width="2.6" d="m6 6 12 12m3-6a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`;
     }
@@ -1206,7 +1299,11 @@ export function createMapController() {
       setAdministrativeMarkerVisible(marker, true);
     }
 
-    if (!map.hasLayer(layers.administrative) || administrativeSourceMarkers.length < 2) return;
+    if (
+      !map.hasLayer(layers.administrative) ||
+      administrativeSourceMarkers.length < 2
+    )
+      return;
 
     const points = administrativeSourceMarkers.map((marker) =>
       map.latLngToContainerPoint(marker.getLatLng()),
@@ -1244,8 +1341,14 @@ export function createMapController() {
         lngSum += ll.lng;
       }
 
-      const center = L.latLng(latSum / groupIndexes.length, lngSum / groupIndexes.length);
-      const clusterMarker = createAdministrativeClusterMarker(center, groupIndexes.length);
+      const center = L.latLng(
+        latSum / groupIndexes.length,
+        lngSum / groupIndexes.length,
+      );
+      const clusterMarker = createAdministrativeClusterMarker(
+        center,
+        groupIndexes.length,
+      );
       administrativeClusterMarkers.push(clusterMarker);
       layers.administrative.addLayer(clusterMarker);
     }
@@ -1268,10 +1371,7 @@ export function createMapController() {
     if (amenity === "toilets") {
       return { type: "restroom", label: "Restroom", score: 1 };
     }
-    if (
-      lowerOffice.includes("security") ||
-      lowerName.includes("guard")
-    ) {
+    if (lowerOffice.includes("security") || lowerName.includes("guard")) {
       return { type: "guard", label: "Guard Shack", score: 2 };
     }
     if (
@@ -1302,17 +1402,18 @@ export function createMapController() {
       };
     }
     if (props.building === "gazebo") {
-      return { type: "gazebo", label: "Gazebo", score: 2 };
+      return { type: "gazebo", label: "Waiting Shed", score: 2 };
     }
     if (props.building === "pavilion") {
       const score = name.toLowerCase().includes("club house") ? 3 : 1;
-      return { type: "pavilion", label: "Pavilion", score };
+      return { type: "pavilion", label: "Club House", score };
     }
     return null;
   }
 
   function administrativeIconSvg(type) {
-    const common = 'class="admin-pin-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"';
+    const common =
+      'class="admin-pin-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"';
     switch (type) {
       case "basketball":
         return `<svg ${common} fill="currentColor"><path fill-rule="evenodd" d="M12 2a10 10 0 1 0 10 10A10.009 10.009 0 0 0 12 2Zm6.613 4.614a8.523 8.523 0 0 1 1.93 5.32 20.093 20.093 0 0 0-5.949-.274c-.059-.149-.122-.292-.184-.441a23.879 23.879 0 0 0-.566-1.239 11.41 11.41 0 0 0 4.769-3.366ZM10 3.707a8.82 8.82 0 0 1 2-.238 8.5 8.5 0 0 1 5.664 2.152 9.608 9.608 0 0 1-4.476 3.087A45.755 45.755 0 0 0 10 3.707Zm-6.358 6.555a8.57 8.57 0 0 1 4.73-5.981 53.99 53.99 0 0 1 3.168 4.941 32.078 32.078 0 0 1-7.9 1.04h.002Zm2.01 7.46a8.51 8.51 0 0 1-2.2-5.707v-.262a31.641 31.641 0 0 0 8.777-1.219c.243.477.477.964.692 1.449-.114.032-.227.067-.336.1a13.569 13.569 0 0 0-6.942 5.636l.009.003ZM12 20.556a8.508 8.508 0 0 1-5.243-1.8 11.717 11.717 0 0 1 6.7-5.332.509.509 0 0 1 .055-.02 35.65 35.65 0 0 1 1.819 6.476 8.476 8.476 0 0 1-3.331.676Zm4.772-1.462A37.232 37.232 0 0 0 15.113 13a12.513 12.513 0 0 1 5.321.364 8.56 8.56 0 0 1-3.66 5.73h-.002Z" clip-rule="evenodd"/></svg>`;
@@ -1619,7 +1720,9 @@ export function createMapController() {
     for (const [dx, dy] of offsets) {
       const candidate = L.point(center.x + dx, center.y + dy);
       const box = roadLabelBoxAt(candidate, size);
-      const blockedByObstacle = obstacleBoxes.some((b) => boxIntersects(box, b));
+      const blockedByObstacle = obstacleBoxes.some((b) =>
+        boxIntersects(box, b),
+      );
       if (blockedByObstacle) continue;
       const blockedByLabel = usedLabelBoxes.some((b) => boxIntersects(box, b));
       if (blockedByLabel) continue;
@@ -1631,7 +1734,8 @@ export function createMapController() {
 
   function refreshRoadNameLabels() {
     layers.roadNames.clearLayers();
-    if (!map.hasLayer(layers.roadNames) || roadNameCandidates.length === 0) return;
+    if (!map.hasLayer(layers.roadNames) || roadNameCandidates.length === 0)
+      return;
 
     const thresholdMeters = pixelsToMeters(mergePixelsForZoom(map.getZoom()));
     const obstacleBoxes = collectObstacleBoxesPx();
@@ -1645,7 +1749,9 @@ export function createMapController() {
     for (const [name, points] of byName) {
       const kept = [];
       for (const point of points) {
-        const tooClose = kept.some((k) => k.distanceTo(point) < thresholdMeters);
+        const tooClose = kept.some(
+          (k) => k.distanceTo(point) < thresholdMeters,
+        );
         if (tooClose) continue;
         const placed = findRoadLabelPlacement(
           point,
@@ -1679,7 +1785,12 @@ export function createMapController() {
   function indexRoadEdgeNames(feature) {
     const props = feature.properties || {};
     const roadName = props.name;
-    if (!roadName || !feature.geometry || feature.geometry.type !== "LineString") return;
+    if (
+      !roadName ||
+      !feature.geometry ||
+      feature.geometry.type !== "LineString"
+    )
+      return;
     const coords = feature.geometry.coordinates;
     for (let i = 0; i < coords.length - 1; i++) {
       const a = coordGraphKey(coords[i]);
@@ -1712,7 +1823,8 @@ export function createMapController() {
         if (!map.hasLayer(layers.forestTrees)) layers.forestTrees.addTo(map);
       } else {
         if (map.hasLayer(layers.pois)) map.removeLayer(layers.pois);
-        if (map.hasLayer(layers.forestTrees)) map.removeLayer(layers.forestTrees);
+        if (map.hasLayer(layers.forestTrees))
+          map.removeLayer(layers.forestTrees);
       }
       return;
     }
@@ -1738,7 +1850,10 @@ export function createMapController() {
   /** Centers on the whole subdivision, or on the active route's start/end if one is drawn. */
   function recenterMap() {
     if (lastEtaInfo && activeDest && gateMarker) {
-      const bounds = L.latLngBounds([gateMarker.getLatLng(), lastEtaInfo.latlng]);
+      const bounds = L.latLngBounds([
+        gateMarker.getLatLng(),
+        lastEtaInfo.latlng,
+      ]);
       if (activeDest.bounds) bounds.extend(activeDest.bounds);
       // extra top padding reserves room for the ETA popup, which sits above the destination
       map.fitBounds(bounds, {
@@ -1964,7 +2079,11 @@ export function createMapController() {
   /** Re-snaps the gate to the nearest drivable road point and redraws the active route from there. */
   function relocateGate(latlng) {
     if (!roadGraph) return;
-    const newKey = snapPointToGraph(roadGraph, [latlng.lng, latlng.lat], mainRoadComponent);
+    const newKey = snapPointToGraph(
+      roadGraph,
+      [latlng.lng, latlng.lat],
+      mainRoadComponent,
+    );
     if (!newKey) return;
 
     if (activeDest?.destCenter) {
@@ -2014,7 +2133,11 @@ export function createMapController() {
     let route = null;
     let destSnapKey = null;
     if (roadGraph && gateNodeKey && destCenter) {
-      destSnapKey = snapPointToGraph(roadGraph, [destCenter.lng, destCenter.lat], mainRoadComponent);
+      destSnapKey = snapPointToGraph(
+        roadGraph,
+        [destCenter.lng, destCenter.lat],
+        mainRoadComponent,
+      );
       if (destSnapKey) {
         connectSnapNodesIfSameSegment(roadGraph, gateNodeKey, destSnapKey);
         route = runRouteWithAvoidance(gateNodeKey, destSnapKey);
@@ -2047,7 +2170,10 @@ export function createMapController() {
       }
       unsnapPoint(roadGraph, destSnapKey);
       if (fromReroute && gateMarker && destCenter) {
-        const blockedBounds = L.latLngBounds([gateMarker.getLatLng(), destCenter]);
+        const blockedBounds = L.latLngBounds([
+          gateMarker.getLatLng(),
+          destCenter,
+        ]);
         if (bounds) blockedBounds.extend(bounds);
         map.fitBounds(blockedBounds, { maxZoom: 19, padding: [60, 60] });
       } else if (bounds) {
@@ -2070,7 +2196,12 @@ export function createMapController() {
 
     layers.pois.eachLayer((layer) => {
       const props = layer.feature?.properties;
-      if (!props || props.category !== "poi-tree" || typeof layer.getLatLng !== "function") return;
+      if (
+        !props ||
+        props.category !== "poi-tree" ||
+        typeof layer.getLatLng !== "function"
+      )
+        return;
       const el = layer.getElement && layer.getElement();
       if (!el) return;
 
@@ -2091,7 +2222,13 @@ export function createMapController() {
   }
 
   /** Animates a marker along the route, then updates route details in the corner panel. */
-  function animateRoute(pathLatLngs, pathNodeKeys, distanceMeters, destLatLng, options = {}) {
+  function animateRoute(
+    pathLatLngs,
+    pathNodeKeys,
+    distanceMeters,
+    destLatLng,
+    options = {},
+  ) {
     L.polyline(pathLatLngs, {
       className: "route-casing",
       color: "#1a1a1a",
@@ -2164,8 +2301,21 @@ export function createMapController() {
   }
 
   /** Renders the corner route panel with unit details, ETAs, and short turn-by-turn narrative. */
-  function renderRoutePanel(latlng, distanceMeters, pathLatLngs, pathNodeKeys, options = {}) {
-    if (!routePanel || !routeUnitEl || !routeMetaEl || !routeEtaRowsEl || !routeNarrativeEl) return;
+  function renderRoutePanel(
+    latlng,
+    distanceMeters,
+    pathLatLngs,
+    pathNodeKeys,
+    options = {},
+  ) {
+    if (
+      !routePanel ||
+      !routeUnitEl ||
+      !routeMetaEl ||
+      !routeEtaRowsEl ||
+      !routeNarrativeEl
+    )
+      return;
 
     setPanelMode("route");
 
@@ -2191,7 +2341,11 @@ export function createMapController() {
       .join("");
     routeEtaRowsEl.innerHTML = rows;
 
-    routeNarrativeEl.innerHTML = buildNarrative(pathLatLngs, pathNodeKeys, distanceMeters);
+    routeNarrativeEl.innerHTML = buildNarrative(
+      pathLatLngs,
+      pathNodeKeys,
+      distanceMeters,
+    );
     showRoutePanel(options);
   }
 
@@ -2274,7 +2428,11 @@ export function createMapController() {
       routePanel.classList.add("hidden");
       return;
     }
-    if (routePanel.classList.contains("hidden") || routePanel.classList.contains("is-hiding")) return;
+    if (
+      routePanel.classList.contains("hidden") ||
+      routePanel.classList.contains("is-hiding")
+    )
+      return;
     routePanel.classList.remove("is-visible");
     routePanel.classList.add("is-hiding");
     panelHideTimer = setTimeout(() => {
@@ -2295,11 +2453,14 @@ export function createMapController() {
     const debugRows = [];
 
     const firstLeg = legs[0];
-    const firstRoad = firstLeg && firstLeg.name ? ` on ${formatRoadName(firstLeg.name)}` : "";
+    const firstRoad =
+      firstLeg && firstLeg.name ? ` on ${formatRoadName(firstLeg.name)}` : "";
     const firstDist = firstLeg
       ? Math.max(5, Math.round(firstLeg.distanceMeters))
       : Math.max(5, Math.round(pathLatLngs[0].distanceTo(pathLatLngs[1])));
-    steps.push(`From ${startLabel}, head out${firstRoad} for ${firstDist} meters.`);
+    steps.push(
+      `From ${startLabel}, head out${firstRoad} for ${firstDist} meters.`,
+    );
     if (routeDebugEnabled) {
       debugRows.push({
         step: 0,
@@ -2313,7 +2474,11 @@ export function createMapController() {
         roadNameChanges: "-",
         crossingsBeforeTurn: "-",
         crossingsWithinLeg: firstLeg
-          ? countCrossingsForLeg(pathNodeKeys, firstLeg.startPointIndex, firstLeg.endPointIndex)
+          ? countCrossingsForLeg(
+              pathNodeKeys,
+              firstLeg.startPointIndex,
+              firstLeg.endPointIndex,
+            )
           : 0,
         meters: firstDist,
         instruction: steps[steps.length - 1],
@@ -2328,21 +2493,26 @@ export function createMapController() {
       const curr = pathLatLngs[boundary];
       const next = pathLatLngs[boundary + 1];
       const turn = prev && curr && next ? describeTurn(prev, curr, next) : null;
-      const boundaryIsIntersection = isRealIntersectionOnPath(pathNodeKeys, boundary);
+      const boundaryIsIntersection = isRealIntersectionOnPath(
+        pathNodeKeys,
+        boundary,
+      );
       const lastBoundaryBeforeDestination = i === legs.length - 1;
       const roadNameChanges = (prevLeg?.name || null) !== (leg.name || null);
       const notableTurn = isNotableTurn(turn);
       const shouldAnnounceTurn =
         Boolean(turn) &&
-        (
-          boundaryIsIntersection ||
+        (boundaryIsIntersection ||
           roadNameChanges ||
-          (lastBoundaryBeforeDestination && notableTurn)
-        );
+          (lastBoundaryBeforeDestination && notableTurn));
       const effectiveTurn = shouldAnnounceTurn ? turn : null;
       const roadRef = leg.name ? ` onto ${formatRoadName(leg.name)}` : "";
       const dist = Math.max(5, Math.round(leg.distanceMeters));
-      const crossingCount = countCrossingsForLeg(pathNodeKeys, leg.startPointIndex, leg.endPointIndex);
+      const crossingCount = countCrossingsForLeg(
+        pathNodeKeys,
+        leg.startPointIndex,
+        leg.endPointIndex,
+      );
       const turnCrossingCount = prevLeg
         ? countCrossingsForLeg(
             pathNodeKeys,
@@ -2353,22 +2523,33 @@ export function createMapController() {
 
       if (effectiveTurn) {
         if (turnCrossingCount > 1) {
-          steps.push(`Then after ${ordinalWord(turnCrossingCount)} intersection, turn ${effectiveTurn} ${formatTurnIcon(effectiveTurn.includes("left") ? "left" : "right")}${roadRef} and continue for ${dist} meters.`);
+          steps.push(
+            `Then after ${ordinalWord(turnCrossingCount)} intersection, turn ${effectiveTurn} ${formatTurnIcon(effectiveTurn.includes("left") ? "left" : "right")}${roadRef} and continue for ${dist} meters.`,
+          );
         } else if (turnCrossingCount === 1) {
-          steps.push(`Then at intersection, turn ${effectiveTurn} ${formatTurnIcon(effectiveTurn.includes("left") ? "left" : "right")}${roadRef} and continue for ${dist} meters.`);
+          steps.push(
+            `Then at intersection, turn ${effectiveTurn} ${formatTurnIcon(effectiveTurn.includes("left") ? "left" : "right")}${roadRef} and continue for ${dist} meters.`,
+          );
         } else {
-          steps.push(`Then turn ${effectiveTurn} ${formatTurnIcon(effectiveTurn.includes("left") ? "left" : "right")}${roadRef} and continue for ${dist} meters.`);
+          steps.push(
+            `Then turn ${effectiveTurn} ${formatTurnIcon(effectiveTurn.includes("left") ? "left" : "right")}${roadRef} and continue for ${dist} meters.`,
+          );
         }
       } else {
-        const crossingText = crossingCount > 0
-          ? ` after ${ordinalWord(crossingCount)} intersection`
-          : "";
+        const crossingText =
+          crossingCount > 0
+            ? ` after ${ordinalWord(crossingCount)} intersection`
+            : "";
         if (!crossingText && !roadRef) {
           steps.push(`Then continue for ${dist} meters.`);
         } else if (roadRef && !crossingText) {
-          steps.push(`Then continue on ${formatRoadName(leg.name)} for ${dist} meters.`);
+          steps.push(
+            `Then continue on ${formatRoadName(leg.name)} for ${dist} meters.`,
+          );
         } else {
-          steps.push(`Then continue straight ${formatTurnIcon("straight")}${crossingText}${roadRef} for ${dist} meters.`);
+          steps.push(
+            `Then continue straight ${formatTurnIcon("straight")}${crossingText}${roadRef} for ${dist} meters.`,
+          );
         }
       }
 
@@ -2391,7 +2572,9 @@ export function createMapController() {
       }
     }
 
-    steps.push(`You will arrive after about ${Math.round(distanceMeters)} meters.`);
+    steps.push(
+      `You will arrive after about ${Math.round(distanceMeters)} meters.`,
+    );
     if (routeDebugEnabled) {
       logRouteNarrativeDebug({
         startLabel,
@@ -2463,8 +2646,7 @@ export function createMapController() {
   }
 
   function formatTurnIcon(type) {
-    const rotation =
-      type === "left" ? "-90" : type === "right" ? "90" : "0";
+    const rotation = type === "left" ? "-90" : type === "right" ? "90" : "0";
     return `<span class="route-turn-icon" aria-hidden="true"><svg class="route-turn-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" style="transform: rotate(${rotation}deg)"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v13m0-13 4 4m-4-4-4 4"/></svg></span>`;
   }
 
@@ -2499,7 +2681,10 @@ export function createMapController() {
       let boundaryIsIntersection = false;
       if (prev) {
         const boundary = seg.startPointIndex;
-        boundaryIsIntersection = isRealIntersectionOnPath(pathNodeKeys, boundary);
+        boundaryIsIntersection = isRealIntersectionOnPath(
+          pathNodeKeys,
+          boundary,
+        );
         const a = pathLatLngs[boundary - 1];
         const b = pathLatLngs[boundary];
         const c = pathLatLngs[boundary + 1];
@@ -2509,24 +2694,29 @@ export function createMapController() {
 
       const hasSameNamedRoad =
         Boolean(prev?.name) && Boolean(seg.name) && prev.name === seg.name;
-      const isNonIntersectionContinuation = Boolean(prev) && !boundaryIsIntersection;
+      const isNonIntersectionContinuation =
+        Boolean(prev) && !boundaryIsIntersection;
       const isUnnamedStraightContinuation =
-        Boolean(prev) && !prev.name && !seg.name &&
+        Boolean(prev) &&
+        !prev.name &&
+        !seg.name &&
         (isStraightContinuation || isNonIntersectionContinuation);
       const isNamedStraightContinuation =
-        Boolean(prev) && hasSameNamedRoad &&
+        Boolean(prev) &&
+        hasSameNamedRoad &&
         (isStraightContinuation || isNonIntersectionContinuation);
       const isUnnamedNamedStraightContinuation =
-        Boolean(prev) && isNonIntersectionContinuation && isStraightContinuation &&
-        ((Boolean(prev.name) && !seg.name) || (!prev.name && Boolean(seg.name)));
+        Boolean(prev) &&
+        isNonIntersectionContinuation &&
+        isStraightContinuation &&
+        ((Boolean(prev.name) && !seg.name) ||
+          (!prev.name && Boolean(seg.name)));
 
       if (
         prev &&
-        (
-          isNamedStraightContinuation ||
+        (isNamedStraightContinuation ||
           isUnnamedStraightContinuation ||
-          isUnnamedNamedStraightContinuation
-        )
+          isUnnamedNamedStraightContinuation)
       ) {
         // Preserve whichever segment carries a road name when one side is unnamed.
         if (!prev.name && seg.name) prev.name = seg.name;
@@ -2544,14 +2734,21 @@ export function createMapController() {
       const last = legs[legs.length - 1];
       const prev = legs[legs.length - 2];
       const boundary = last.startPointIndex;
-      const hasDecisionBoundary = isRealIntersectionOnPath(pathNodeKeys, boundary);
+      const hasDecisionBoundary = isRealIntersectionOnPath(
+        pathNodeKeys,
+        boundary,
+      );
       const a = pathLatLngs[boundary - 1];
       const b = pathLatLngs[boundary];
       const c = pathLatLngs[boundary + 1];
       const boundaryTurn = a && b && c ? describeTurn(a, b, c) : null;
       const hasNotableBoundaryTurn = isNotableTurn(boundaryTurn);
       const isShortUnnamedTail = !last.name && last.distanceMeters <= 20;
-      if (isShortUnnamedTail && !hasDecisionBoundary && !hasNotableBoundaryTurn) {
+      if (
+        isShortUnnamedTail &&
+        !hasDecisionBoundary &&
+        !hasNotableBoundaryTurn
+      ) {
         prev.distanceMeters += last.distanceMeters;
         prev.endPointIndex = last.endPointIndex;
         legs.pop();
@@ -2638,7 +2835,9 @@ export function createMapController() {
       const branchCoord = roadGraph.nodes.get(edge.to);
       if (!branchCoord) continue;
       const branchBearing = bearingBetweenCoords(nodeCoord, branchCoord);
-      const delta = Math.abs(bearingDeltaDegrees(forwardBearing, branchBearing));
+      const delta = Math.abs(
+        bearingDeltaDegrees(forwardBearing, branchBearing),
+      );
       // A meaningful side branch indicates a real intersection/junction.
       if (delta >= 35 && delta <= 150) return true;
     }
@@ -2647,7 +2846,15 @@ export function createMapController() {
   }
 
   function ordinalWord(n) {
-    const words = ["zero", "first", "second", "third", "fourth", "fifth", "sixth"];
+    const words = [
+      "zero",
+      "first",
+      "second",
+      "third",
+      "fourth",
+      "fifth",
+      "sixth",
+    ];
     return words[n] || `${n}th`;
   }
 
@@ -2738,9 +2945,15 @@ export function createMapController() {
 
   /** Reopens the route panel when the highlighted unit is clicked again after dismissing it. */
   function reopenEtaPopupFor(layer) {
-    if (!highlighted || !highlighted.layers.includes(layer) || !lastEtaInfo) return;
+    if (!highlighted || !highlighted.layers.includes(layer) || !lastEtaInfo)
+      return;
     // Clicking the same active unit while panel is already shown should be a no-op.
-    if (routePanel && routePanel.classList.contains("is-visible") && !routePanel.classList.contains("hidden")) return;
+    if (
+      routePanel &&
+      routePanel.classList.contains("is-visible") &&
+      !routePanel.classList.contains("hidden")
+    )
+      return;
     renderRoutePanel(
       lastEtaInfo.latlng,
       lastEtaInfo.distanceMeters,
@@ -2822,7 +3035,8 @@ export function createMapController() {
       });
       layer.bringToFront();
       const layerBounds = layer.getBounds ? layer.getBounds() : null;
-      if (layerBounds) bounds = bounds ? bounds.extend(layerBounds) : layerBounds;
+      if (layerBounds)
+        bounds = bounds ? bounds.extend(layerBounds) : layerBounds;
     }
     highlighted = { layers: entry.layers, props: entry.props };
 
