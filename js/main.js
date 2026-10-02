@@ -31,12 +31,20 @@ const controller = createMapController();
 controller.loadData("data/ecoverde.geojson");
 
 const LAYER_PREFS_STORAGE_KEY = "ecoverde:layer-visibility";
-const DEFAULT_LAYER_PREFS = {
+const DEFAULT_LAYER_PREFS_DESKTOP = {
   obstacle: false,
-  administrative: true,
-  amenities: true,
+  administrative: false,
+  amenities: false,
   roadNames: false,
   decoration: true,
+};
+
+const DEFAULT_LAYER_PREFS_PHONE = {
+  obstacle: false,
+  administrative: false,
+  amenities: false,
+  roadNames: false,
+  decoration: false,
 };
 
 const searchForm = document.getElementById("search-form");
@@ -51,6 +59,12 @@ const layerDecoration = document.getElementById("layer-decoration");
 const layerDecorationOption = document.getElementById("layer-decoration-option");
 const routeClearButton = document.getElementById("route-clear");
 const isPhoneDevice = detectPhoneDevice();
+
+function defaultLayerPrefs() {
+  return isPhoneDevice
+    ? { ...DEFAULT_LAYER_PREFS_PHONE }
+    : { ...DEFAULT_LAYER_PREFS_DESKTOP };
+}
 
 function detectPhoneDevice() {
   const uaMobile = navigator.userAgentData?.mobile;
@@ -68,19 +82,20 @@ function detectPhoneDevice() {
 }
 
 function readLayerPrefs() {
+  const fallback = defaultLayerPrefs();
   try {
     const raw = localStorage.getItem(LAYER_PREFS_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_LAYER_PREFS };
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     return {
       obstacle: Boolean(parsed?.obstacle),
-      administrative: parsed?.administrative ?? DEFAULT_LAYER_PREFS.administrative,
-      amenities: parsed?.amenities ?? DEFAULT_LAYER_PREFS.amenities,
+      administrative: parsed?.administrative ?? fallback.administrative,
+      amenities: parsed?.amenities ?? fallback.amenities,
       roadNames: Boolean(parsed?.roadNames),
-      decoration: parsed?.decoration ?? DEFAULT_LAYER_PREFS.decoration,
+      decoration: parsed?.decoration ?? fallback.decoration,
     };
   } catch {
-    return { ...DEFAULT_LAYER_PREFS };
+    return fallback;
   }
 }
 

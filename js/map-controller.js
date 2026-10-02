@@ -276,6 +276,7 @@ export function createMapController() {
     updateTreeRouteOcclusion(activeRoutePathLatLngs);
     updateAdministrativeClusters();
     updateAmenitiesClusters();
+    bringGroupToFront(layers.roadNames);
   });
   map.on("zoom", () => {
     scheduleTreeSizeScale();
@@ -536,7 +537,6 @@ export function createMapController() {
     applyRoadStrokeScale();
     applyRoadLayerOrder();
     refreshRoadNameLabels();
-    populatePeripheralForest(dataBounds, collection.features);
     applyTreeNeighborRotationDiversity();
     applyTreeSizeScale();
   }
@@ -575,6 +575,9 @@ export function createMapController() {
 
     // Keep walls above other vector overlays. Fences remain in the normal barrier layer.
     bringGroupToFront(layers.wallBarriers);
+
+    // Road names should render above all map overlays.
+    bringGroupToFront(layers.roadNames);
   }
 
   function mulberry32(seed) {
@@ -1836,7 +1839,7 @@ export function createMapController() {
       }),
       interactive: false,
       keyboard: false,
-      zIndexOffset: -100,
+      zIndexOffset: 5000,
     });
   }
 
