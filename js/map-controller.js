@@ -1264,7 +1264,7 @@ export function createMapController() {
     const realEstatePins = [];
     const adminOfficePins = [];
     const gazeboPins = [];
-    const amenityTypes = new Set(["basketball", "restroom", "pavilion"]);
+    const amenityTypes = new Set(["basketball", "restroom", "pavilion", "gazebo"]);
     for (const feature of features) {
       const pin = pinMetaForFeature(feature);
       if (!pin) continue;
