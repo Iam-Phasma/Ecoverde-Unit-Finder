@@ -46,7 +46,24 @@ const layerObstacle = document.getElementById("layer-obstacle");
 const layerAdministrative = document.getElementById("layer-administrative");
 const layerRoadNames = document.getElementById("layer-road-names");
 const layerDecoration = document.getElementById("layer-decoration");
+const layerDecorationLabel = layerDecoration?.closest("label") || null;
 const routeClearButton = document.getElementById("route-clear");
+const isPhoneDevice = detectPhoneDevice();
+
+function detectPhoneDevice() {
+  const uaMobile = navigator.userAgentData?.mobile;
+  if (typeof uaMobile === "boolean") return uaMobile;
+
+  const ua = navigator.userAgent || "";
+  const isTablet = /iPad|Tablet|Kindle|Silk|PlayBook|Nexus 7|Nexus 9|Nexus 10/i.test(
+    ua,
+  );
+  if (isTablet) return false;
+
+  return /iPhone|iPod|Windows Phone|IEMobile|Opera Mini|Android.*Mobile|Mobile/i.test(
+    ua,
+  );
+}
 
 function readLayerPrefs() {
   try {
@@ -69,7 +86,7 @@ function writeLayerPrefs() {
     obstacle: Boolean(layerObstacle.checked),
     administrative: Boolean(layerAdministrative.checked),
     roadNames: Boolean(layerRoadNames.checked),
-    decoration: Boolean(layerDecoration.checked),
+    decoration: isPhoneDevice ? false : Boolean(layerDecoration.checked),
   };
   try {
     localStorage.setItem(LAYER_PREFS_STORAGE_KEY, JSON.stringify(next));
@@ -119,6 +136,7 @@ layerRoadNames.addEventListener("change", () => {
 });
 
 layerDecoration.addEventListener("change", () => {
+  if (isPhoneDevice) return;
   controller.setLayerVisibility("decoration", layerDecoration.checked);
   writeLayerPrefs();
 });
@@ -131,13 +149,27 @@ const layerPrefs = readLayerPrefs();
 layerObstacle.checked = layerPrefs.obstacle;
 layerAdministrative.checked = layerPrefs.administrative;
 layerRoadNames.checked = layerPrefs.roadNames;
-layerDecoration.checked = layerPrefs.decoration;
+
+if (isPhoneDevice) {
+  layerDecoration.checked = false;
+  layerDecoration.disabled = true;
+  layerDecorationLabel?.setAttribute("hidden", "");
+} else {
+  layerDecoration.checked = layerPrefs.decoration;
+  layerDecoration.disabled = false;
+  layerDecorationLabel?.removeAttribute("hidden");
+}
 
 // Default state (when no cache): administrative + decoration on; others off.
 controller.setLayerVisibility("roadNames", layerRoadNames.checked);
 controller.setLayerVisibility("administrative", layerAdministrative.checked);
 controller.setLayerVisibility("obstacle", layerObstacle.checked);
-controller.setLayerVisibility("decoration", layerDecoration.checked);
+controller.setLayerVisibility(
+  "decoration",
+  isPhoneDevice ? false : layerDecoration.checked,
+);
+
+if (isPhoneDevice) writeLayerPrefs();
 updateFindButtonState();
 
 searchForm.addEventListener("submit", (e) => {
