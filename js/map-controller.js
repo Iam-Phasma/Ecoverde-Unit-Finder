@@ -64,6 +64,7 @@ function blockageMarkerIconSvg() {
 
 export function createMapController() {
   const bakedRenderer = L.canvas({ padding: 1.2 });
+  const routeRenderer = L.svg({ padding: 1.2 });
   const map = L.map("map", {
     zoomControl: false,
     attributionControl: false,
@@ -2230,6 +2231,7 @@ export function createMapController() {
     options = {},
   ) {
     L.polyline(pathLatLngs, {
+      renderer: routeRenderer,
       className: "route-casing",
       color: "#1a1a1a",
       weight: 8,
@@ -2239,6 +2241,7 @@ export function createMapController() {
     }).addTo(layers.route);
 
     L.polyline(pathLatLngs, {
+      renderer: routeRenderer,
       className: "route-flow",
       color: "#e0a800",
       weight: 5,
