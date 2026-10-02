@@ -341,6 +341,18 @@ main {
   opacity: 0.35;
 }
 
+.parking-pin-badge {
+  border-color: #8f918f;
+  color: #6f7271;
+  background: #eef0ed;
+}
+
+.parking-pin-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
 .road-name-label {
   pointer-events: none;
 }

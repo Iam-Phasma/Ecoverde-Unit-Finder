@@ -34,6 +34,7 @@ const LAYER_PREFS_STORAGE_KEY = "ecoverde:layer-visibility";
 const DEFAULT_LAYER_PREFS = {
   obstacle: false,
   administrative: true,
+  amenities: true,
   roadNames: false,
   decoration: true,
 };
@@ -44,9 +45,10 @@ const layersToggle = document.getElementById("layers-toggle");
 const layersPanel = document.getElementById("layers-panel");
 const layerObstacle = document.getElementById("layer-obstacle");
 const layerAdministrative = document.getElementById("layer-administrative");
+const layerAmenities = document.getElementById("layer-amenities");
 const layerRoadNames = document.getElementById("layer-road-names");
 const layerDecoration = document.getElementById("layer-decoration");
-const layerDecorationLabel = layerDecoration?.closest("label") || null;
+const layerDecorationOption = document.getElementById("layer-decoration-option");
 const routeClearButton = document.getElementById("route-clear");
 const isPhoneDevice = detectPhoneDevice();
 
@@ -73,6 +75,7 @@ function readLayerPrefs() {
     return {
       obstacle: Boolean(parsed?.obstacle),
       administrative: parsed?.administrative ?? DEFAULT_LAYER_PREFS.administrative,
+      amenities: parsed?.amenities ?? DEFAULT_LAYER_PREFS.amenities,
       roadNames: Boolean(parsed?.roadNames),
       decoration: parsed?.decoration ?? DEFAULT_LAYER_PREFS.decoration,
     };
@@ -85,6 +88,7 @@ function writeLayerPrefs() {
   const next = {
     obstacle: Boolean(layerObstacle.checked),
     administrative: Boolean(layerAdministrative.checked),
+    amenities: Boolean(layerAmenities.checked),
     roadNames: Boolean(layerRoadNames.checked),
     decoration: isPhoneDevice ? false : Boolean(layerDecoration.checked),
   };
@@ -130,6 +134,11 @@ layerAdministrative.addEventListener("change", () => {
   writeLayerPrefs();
 });
 
+layerAmenities.addEventListener("change", () => {
+  controller.setLayerVisibility("amenities", layerAmenities.checked);
+  writeLayerPrefs();
+});
+
 layerRoadNames.addEventListener("change", () => {
   controller.setLayerVisibility("roadNames", layerRoadNames.checked);
   writeLayerPrefs();
@@ -148,21 +157,25 @@ routeClearButton?.addEventListener("click", resetSelectionInputs);
 const layerPrefs = readLayerPrefs();
 layerObstacle.checked = layerPrefs.obstacle;
 layerAdministrative.checked = layerPrefs.administrative;
+layerAmenities.checked = layerPrefs.amenities;
 layerRoadNames.checked = layerPrefs.roadNames;
 
 if (isPhoneDevice) {
   layerDecoration.checked = false;
   layerDecoration.disabled = true;
-  layerDecorationLabel?.setAttribute("hidden", "");
+  layerDecorationOption?.setAttribute("hidden", "");
+  layerDecorationOption?.setAttribute("aria-hidden", "true");
 } else {
   layerDecoration.checked = layerPrefs.decoration;
   layerDecoration.disabled = false;
-  layerDecorationLabel?.removeAttribute("hidden");
+  layerDecorationOption?.removeAttribute("hidden");
+  layerDecorationOption?.removeAttribute("aria-hidden");
 }
 
 // Default state (when no cache): administrative + decoration on; others off.
 controller.setLayerVisibility("roadNames", layerRoadNames.checked);
 controller.setLayerVisibility("administrative", layerAdministrative.checked);
+controller.setLayerVisibility("amenities", layerAmenities.checked);
 controller.setLayerVisibility("obstacle", layerObstacle.checked);
 controller.setLayerVisibility(
   "decoration",

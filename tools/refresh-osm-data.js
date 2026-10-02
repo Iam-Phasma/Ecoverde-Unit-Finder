@@ -32,6 +32,7 @@ area(${3600000000 + RELATION_ID})->.searchArea;
   way(area.searchArea)[building];
   way(area.searchArea)[highway];
   way(area.searchArea)[landuse];
+  way(area.searchArea)[amenity=parking];
   way(area.searchArea)[natural];
   way(area.searchArea)[leisure];
   way(area.searchArea)[barrier];

@@ -62,6 +62,17 @@ function blockageMarkerIconSvg() {
   return '<svg class="avoid-marker-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-4.5 9h9"/></svg>';
 }
 
+function parkingMarkerIconSvg() {
+  return '<svg class="parking-pin-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h6l2 4m-8-4v8m0-8V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v9h2m8 0H9m4 0h2m4 0h2v-4m0 0h-5m3.5 5.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Zm-10 0a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z"/></svg>';
+}
+
+function parkingTooltipLabel(props = {}) {
+  const details = [];
+  if (props.capacity) details.push(`Capacity ${props.capacity}`);
+  if (props.surface) details.push(`Surface ${props.surface}`);
+  return details.length ? `Parking · ${details.join(" · ")}` : "Parking";
+}
+
 export function createMapController() {
   const bakedRenderer = L.canvas({ padding: 1.2 });
   const routeRenderer = L.svg({ padding: 1.2 });
@@ -177,8 +188,12 @@ export function createMapController() {
     contextRoadsCenter: L.layerGroup().addTo(map),
     obstacle: L.layerGroup(),
     administrative: L.layerGroup().addTo(map),
+    amenities: L.layerGroup().addTo(map),
     buildings: L.layerGroup().addTo(map),
+    parking: L.layerGroup().addTo(map),
+    parkingIcons: L.layerGroup().addTo(map),
     barriers: L.layerGroup().addTo(map),
+    wallBarriers: L.layerGroup().addTo(map),
     pois: L.layerGroup().addTo(map),
     route: L.layerGroup().addTo(map),
     gate: L.layerGroup().addTo(map),
@@ -224,6 +239,8 @@ export function createMapController() {
   let activeRoutePathLatLngs = null;
   let administrativeSourceMarkers = [];
   let administrativeClusterMarkers = [];
+  let amenitiesSourceMarkers = [];
+  let amenitiesClusterMarkers = [];
   let treeScaleRafId = null;
 
   // Small console API for debugging route narrative decisions.
@@ -258,6 +275,7 @@ export function createMapController() {
     applyTreeSizeScale();
     updateTreeRouteOcclusion(activeRoutePathLatLngs);
     updateAdministrativeClusters();
+    updateAmenitiesClusters();
   });
   map.on("zoom", () => {
     scheduleTreeSizeScale();
@@ -276,10 +294,17 @@ export function createMapController() {
     layers.roadNames.clearLayers();
     layers.obstacle.clearLayers();
     layers.administrative.clearLayers();
+    layers.amenities.clearLayers();
+    layers.parking.clearLayers();
+    layers.parkingIcons.clearLayers();
     layers.footpathsCasing.clearLayers();
     layers.footpaths.clearLayers();
+    layers.barriers.clearLayers();
+    layers.wallBarriers.clearLayers();
     administrativeSourceMarkers = [];
     administrativeClusterMarkers = [];
+    amenitiesSourceMarkers = [];
+    amenitiesClusterMarkers = [];
     roadNameByEdge = new Map();
     roadNameCandidates = [];
     const lotsByBlock = new Map(); // block -> Set(lot)
@@ -424,7 +449,32 @@ export function createMapController() {
     geoJsonLayer.eachLayer((layer) => {
       const category = layer.feature.properties.category;
       const props = layer.feature?.properties || {};
+
+      if (category === "parking" && typeof layer.getBounds === "function") {
+        const center = layer.getBounds().getCenter();
+        const label = parkingTooltipLabel(props);
+        const marker = L.marker(center, {
+          icon: L.divIcon({
+            className: "admin-pin parking-pin",
+            html: `<span class="admin-pin-badge parking-pin-badge" title="${escapeHtml(label)}">${parkingMarkerIconSvg()}</span>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+          }),
+          keyboard: false,
+          zIndexOffset: 900,
+        }).bindTooltip(label, {
+          direction: "top",
+          offset: [0, -20],
+          opacity: 0.92,
+        });
+        amenitiesSourceMarkers.push(marker);
+        layers.parkingIcons.addLayer(marker);
+      }
+
       let group = layers[groupForCategory(category)] || layers.buildings;
+      if (category === "barrier" && String(props.barrier || "") === "wall") {
+        group = layers.wallBarriers;
+      }
       if (
         category === "road" &&
         WALK_HIGHWAYS.has(String(props.highway || "").toLowerCase())
@@ -516,6 +566,15 @@ export function createMapController() {
     bringGroupToFront(layers.contextRoadsCasing);
     bringGroupToFront(layers.contextRoads);
     bringGroupToFront(layers.contextRoadsCenter);
+
+    // Parking should remain visible over roads.
+    bringGroupToFront(layers.parking);
+    bringGroupToFront(layers.parkingIcons);
+    bringGroupToFront(layers.leisureCourts);
+    bringGroupToFront(layers.amenities);
+
+    // Keep walls above other vector overlays. Fences remain in the normal barrier layer.
+    bringGroupToFront(layers.wallBarriers);
   }
 
   function mulberry32(seed) {
@@ -1197,13 +1256,19 @@ export function createMapController() {
   function populateAdministrativePins(features) {
     if (!Array.isArray(features)) return;
     const bestByType = new Map();
+    const amenityPins = [];
     const modelUnitPins = [];
     const realEstatePins = [];
     const adminOfficePins = [];
     const gazeboPins = [];
+    const amenityTypes = new Set(["basketball", "restroom", "pavilion"]);
     for (const feature of features) {
       const pin = pinMetaForFeature(feature);
       if (!pin) continue;
+      if (amenityTypes.has(pin.type)) {
+        amenityPins.push({ feature, pin });
+        continue;
+      }
       if (pin.type === "modelUnit") {
         modelUnitPins.push({ feature, pin });
         continue;
@@ -1232,6 +1297,14 @@ export function createMapController() {
       const marker = createAdministrativePin(latlng, pin);
       administrativeSourceMarkers.push(marker);
       layers.administrative.addLayer(marker);
+    }
+
+    for (const { feature, pin } of amenityPins) {
+      const latlng = featureCenterLatLng(feature);
+      if (!latlng) continue;
+      const marker = createAdministrativePin(latlng, pin);
+      amenitiesSourceMarkers.push(marker);
+      layers.amenities.addLayer(marker);
     }
 
     for (const { feature, pin } of modelUnitPins) {
@@ -1278,6 +1351,117 @@ export function createMapController() {
       layers.administrative.removeLayer(marker);
     }
     administrativeClusterMarkers = [];
+  }
+
+  function setAmenitiesMarkerVisible(marker, visible) {
+    marker.setOpacity(visible ? 1 : 0);
+    const el = marker.getElement && marker.getElement();
+    if (el) el.style.pointerEvents = visible ? "" : "none";
+  }
+
+  function clearAmenitiesClusterMarkers() {
+    for (const marker of amenitiesClusterMarkers) {
+      layers.amenities.removeLayer(marker);
+    }
+    amenitiesClusterMarkers = [];
+  }
+
+  function createAmenitiesClusterMarker(latlng, count) {
+    return L.marker(latlng, {
+      icon: L.divIcon({
+        className: "admin-pin admin-pin-cluster",
+        html: `<span class="admin-pin-badge admin-pin-badge--cluster" title="${count} overlapping amenities">${count}</span>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+      }),
+      interactive: false,
+      keyboard: false,
+    });
+  }
+
+  function updateAmenitiesClusters() {
+    clearAmenitiesClusterMarkers();
+
+    for (const marker of amenitiesSourceMarkers) {
+      setAmenitiesMarkerVisible(marker, true);
+    }
+
+    if (
+      (!map.hasLayer(layers.amenities) && !map.hasLayer(layers.parkingIcons)) ||
+      amenitiesSourceMarkers.length < 2
+    ) {
+      return;
+    }
+
+    const points = amenitiesSourceMarkers.map((marker) =>
+      map.latLngToContainerPoint(marker.getLatLng()),
+    );
+    const visited = new Array(amenitiesSourceMarkers.length).fill(false);
+
+    for (let i = 0; i < amenitiesSourceMarkers.length; i++) {
+      if (visited[i]) continue;
+      const stack = [i];
+      visited[i] = true;
+      const groupIndexes = [];
+
+      while (stack.length > 0) {
+        const idx = stack.pop();
+        groupIndexes.push(idx);
+
+        for (let j = 0; j < amenitiesSourceMarkers.length; j++) {
+          if (visited[j]) continue;
+          if (points[idx].distanceTo(points[j]) <= ADMIN_PIN_OVERLAP_PX) {
+            visited[j] = true;
+            stack.push(j);
+          }
+        }
+      }
+
+      if (groupIndexes.length < 2) continue;
+
+      let latSum = 0;
+      let lngSum = 0;
+      for (const idx of groupIndexes) {
+        const marker = amenitiesSourceMarkers[idx];
+        setAmenitiesMarkerVisible(marker, false);
+        const ll = marker.getLatLng();
+        latSum += ll.lat;
+        lngSum += ll.lng;
+      }
+
+      const center = L.latLng(
+        latSum / groupIndexes.length,
+        lngSum / groupIndexes.length,
+      );
+      const clusterMarker = createAmenitiesClusterMarker(
+        center,
+        groupIndexes.length,
+      );
+      amenitiesClusterMarkers.push(clusterMarker);
+      layers.amenities.addLayer(clusterMarker);
+    }
+
+    // Avoid cross-category icon overlap: if an amenities icon sits on top of a
+    // currently visible administrative marker/cluster, hide the amenities icon.
+    if (map.hasLayer(layers.administrative)) {
+      const adminPoints = [];
+      layers.administrative.eachLayer((layer) => {
+        if (typeof layer?.getLatLng !== "function") return;
+        if (typeof layer?.getOpacity === "function" && layer.getOpacity() <= 0.01)
+          return;
+        adminPoints.push(map.latLngToContainerPoint(layer.getLatLng()));
+      });
+
+      if (adminPoints.length > 0) {
+        for (const marker of amenitiesSourceMarkers) {
+          const point = map.latLngToContainerPoint(marker.getLatLng());
+          const overlapsAdmin = adminPoints.some(
+            (adminPoint) => point.distanceTo(adminPoint) <= ADMIN_PIN_OVERLAP_PX,
+          );
+          if (overlapsAdmin) setAmenitiesMarkerVisible(marker, false);
+        }
+      }
+    }
   }
 
   function createAdministrativeClusterMarker(latlng, count) {
@@ -1813,10 +1997,26 @@ export function createMapController() {
       obstacle: layers.obstacle,
       roadNames: layers.roadNames,
       administrative: layers.administrative,
+      amenities: layers.amenities,
       decoration: layers.pois,
     };
     const layerGroup = mapping[key];
     if (!layerGroup) return;
+
+    if (key === "amenities") {
+      const amenityGroups = [layers.amenities, layers.parkingIcons];
+      if (visible) {
+        for (const group of amenityGroups) {
+          if (!map.hasLayer(group)) group.addTo(map);
+        }
+      } else {
+        for (const group of amenityGroups) {
+          if (map.hasLayer(group)) map.removeLayer(group);
+        }
+      }
+      updateAmenitiesClusters();
+      return;
+    }
 
     if (key === "decoration") {
       if (visible) {
@@ -2250,6 +2450,9 @@ export function createMapController() {
       lineCap: "round",
       lineJoin: "round",
     }).addTo(layers.route);
+
+    // Route is redrawn dynamically; re-apply wall priority each time.
+    bringGroupToFront(layers.wallBarriers);
 
     const cumulative = [0];
     for (let i = 1; i < pathLatLngs.length; i++) {

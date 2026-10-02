@@ -6,6 +6,7 @@ export function groupForCategory(category) {
   if (category === "context-road") return "contextRoads";
   if (category === "road") return "roads";
   if (category === "landuse") return "landuse";
+  if (category === "parking") return "parking";
   if (category === "leisure") return "leisure";
   if (category === "cityblock") return "cityBlocks";
   if (category === "building") return "buildings";
@@ -292,6 +293,13 @@ export function styleForFeature(feature) {
         weight: 1,
         fillColor: "#c6dbc0",
         fillOpacity: 0.9,
+      };
+    case "parking":
+      return {
+        color: "#8f918f",
+        weight: 1,
+        fillColor: "#babeb9",
+        fillOpacity: 0.92,
       };
     case "leisure":
       if (

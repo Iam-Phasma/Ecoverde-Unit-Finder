@@ -84,6 +84,7 @@ for (const [, el] of ways) {
   if (tags.building) category = "building";
   else if (tags.highway) category = "road";
   else if (tags.landuse) category = "landuse";
+  else if (tags.amenity === "parking") category = "parking";
   else if (tags.natural) category = "natural";
   else if (tags.leisure) category = "leisure";
   else if (tags.barrier) category = "barrier";
@@ -136,8 +137,8 @@ for (const el of raw.elements) {
   });
 }
 
-function isInsideSubdivision(coords) {
-  return coords.every(
+function intersectsSubdivision(coords) {
+  return coords.some(
     ([lon, lat]) =>
       lon >= SUBDIVISION_BBOX.minLon &&
       lon <= SUBDIVISION_BBOX.maxLon &&
@@ -150,7 +151,7 @@ for (const el of barriersRaw.elements) {
   if (el.type !== "way" || !el.tags || !el.tags.barrier) continue;
   const coords = el.geometry.map((p) => [p.lon, p.lat]);
   if (coords.length < 2) continue;
-  if (!isInsideSubdivision(coords)) continue;
+  if (!intersectsSubdivision(coords)) continue;
   features.push({
     type: "Feature",
     properties: { category: "barrier", ...el.tags },
