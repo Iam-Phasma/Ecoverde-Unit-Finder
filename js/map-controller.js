@@ -39,7 +39,6 @@ const FOREST_CLUMP_MIN_TREES = 5;
 const FOREST_CLUMP_MAX_TREES = 11;
 const FOREST_HIGHWAY_CLEARANCE_METERS = 42;
 const FOREST_RIVER_CLEARANCE_METERS = 32;
-const TREE_MIN_PIXEL_SIZE = 8;
 const TREE_NEIGHBOR_ROTATION_CLEARANCE_METERS = 14;
 const TREE_ROTATION_VARIANTS = [
   { className: "tree-icon--rot-neg30", deg: -30 },
@@ -75,6 +74,7 @@ function parkingTooltipLabel(props = {}) {
 
 export function createMapController() {
   const bakedRenderer = L.canvas({ padding: 1.2 });
+  const buildingRenderer = L.svg({ padding: 1.2 });
   const routeRenderer = L.svg({ padding: 1.2 });
   const map = L.map("map", {
     zoomControl: false,
@@ -241,7 +241,6 @@ export function createMapController() {
   let administrativeClusterMarkers = [];
   let amenitiesSourceMarkers = [];
   let amenitiesClusterMarkers = [];
-  let treeScaleRafId = null;
 
   // Small console API for debugging route narrative decisions.
   if (typeof window !== "undefined") {
@@ -273,13 +272,14 @@ export function createMapController() {
     refreshRoadNameLabels();
     applyRoadStrokeScale();
     applyTreeSizeScale();
+    clearTreeZoomAnimationScale();
     updateTreeRouteOcclusion(activeRoutePathLatLngs);
     updateAdministrativeClusters();
     updateAmenitiesClusters();
     bringGroupToFront(layers.roadNames);
   });
-  map.on("zoom", () => {
-    scheduleTreeSizeScale();
+  map.on("zoomanim", (event) => {
+    applyTreeZoomAnimationScale(2 ** (event.zoom - map.getZoom()));
   });
 
   function loadData(url) {
@@ -311,7 +311,16 @@ export function createMapController() {
     const lotsByBlock = new Map(); // block -> Set(lot)
 
     const geoJsonLayer = L.geoJSON(collection, {
-      style: styleForFeature,
+      style: (feature) => {
+        const style = styleForFeature(feature);
+        if (feature.properties?.category !== "building") return style;
+        return {
+          ...style,
+          className: "building-footprint",
+          renderer: buildingRenderer,
+          smoothFactor: 0,
+        };
+      },
       pointToLayer: pointToLayer,
       renderer: bakedRenderer,
       onEachFeature: (feature, layer) => {
@@ -919,18 +928,7 @@ export function createMapController() {
     const latRad = (Math.max(-85, Math.min(85, lat)) * Math.PI) / 180;
     const metersPerPixel =
       (156543.03392 * Math.cos(latRad)) / Math.pow(2, map.getZoom());
-    return Math.max(
-      TREE_MIN_PIXEL_SIZE,
-      sizeMeters / Math.max(metersPerPixel, 1e-9),
-    );
-  }
-
-  function scheduleTreeSizeScale() {
-    if (treeScaleRafId !== null) return;
-    treeScaleRafId = requestAnimationFrame(() => {
-      treeScaleRafId = null;
-      applyTreeSizeScale();
-    });
+    return sizeMeters / Math.max(metersPerPixel, 1e-9);
   }
 
   function buildTreeDivIcon(variant, sizePx) {
@@ -939,7 +937,7 @@ export function createMapController() {
       className: `tree-icon${variant.isBackground ? " tree-icon--bg" : ""}`,
       html: `<span class="tree-icon__glyph ${glyphClasses}"></span>`,
       iconSize: [sizePx, sizePx],
-      iconAnchor: [Math.round(sizePx / 2), Math.round(sizePx * 0.9)],
+      iconAnchor: [(sizePx / 2), (sizePx * 0.9)],
     });
   }
 
@@ -1030,10 +1028,46 @@ export function createMapController() {
 
     iconEl.style.width = `${sizePx}px`;
     iconEl.style.height = `${sizePx}px`;
-    iconEl.style.marginLeft = `${-Math.round(sizePx / 2)}px`;
-    iconEl.style.marginTop = `${-Math.round(sizePx * 0.9)}px`;
+    iconEl.style.marginLeft = `${-(sizePx / 2)}px`;
+    iconEl.style.marginTop = `${-(sizePx * 0.9)}px`;
 
     return true;
+  }
+
+  function treeGlyphOf(layer) {
+    return layer?._icon?.querySelector?.(".tree-icon__glyph") || null;
+  }
+
+  // Scale the inner glyph, not the marker element: the individual `scale`
+  // property composes outside Leaflet's translate3d and would scale the position.
+  function applyTreeZoomAnimationScale(scale) {
+    const scaleLayer = (layerGroup) => {
+      layerGroup.eachLayer((layer) => {
+        const glyph = layer?._treeVariant && treeGlyphOf(layer);
+        if (!glyph) return;
+        glyph.style.transformOrigin = "50% 90%";
+        glyph.style.transition = "scale 0.25s cubic-bezier(0, 0, 0.25, 1)";
+        glyph.style.scale = String(scale);
+      });
+    };
+
+    scaleLayer(layers.pois);
+    scaleLayer(layers.forestTrees);
+  }
+
+  function clearTreeZoomAnimationScale() {
+    const clearLayer = (layerGroup) => {
+      layerGroup.eachLayer((layer) => {
+        const glyph = layer?._treeVariant && treeGlyphOf(layer);
+        if (!glyph) return;
+        glyph.style.transition = "none";
+        glyph.style.removeProperty("scale");
+        glyph.style.removeProperty("transform-origin");
+      });
+    };
+
+    clearLayer(layers.pois);
+    clearLayer(layers.forestTrees);
   }
 
   function applyTreeSizeScale() {
@@ -1060,8 +1094,8 @@ export function createMapController() {
         if (layer.options?.icon?.options) {
           layer.options.icon.options.iconSize = [sizePx, sizePx];
           layer.options.icon.options.iconAnchor = [
-            Math.round(sizePx / 2),
-            Math.round(sizePx * 0.9),
+            (sizePx / 2),
+            (sizePx * 0.9),
           ];
         }
         layer._treePixelSize = sizePx;
