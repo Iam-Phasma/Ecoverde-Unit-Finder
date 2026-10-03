@@ -423,7 +423,7 @@ searchForm.addEventListener("submit", (e) => {
 // Desktop-only welcome overlay: blurred map with a block/lot search, or skip to explore.
 function setupWelcomeOverlay() {
   const overlay = document.getElementById("welcome");
-  if (!overlay || isPhoneDevice) return;
+  if (!overlay) return;
 
   const form = document.getElementById("welcome-form");
   const blockEl = document.getElementById("welcome-block");
