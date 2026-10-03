@@ -1996,8 +1996,64 @@ export function createMapController() {
     const usedLabelBoxes = [];
     const placedByName = new Map();
     const size = map.getSize();
+    const placedSpots = new Set();
 
-    for (const candidate of roadNameCandidates) {
+    const isInViewport = (point) =>
+      point.x >= 0 && point.y >= 0 && point.x <= size.x && point.y <= size.y;
+
+    function projectLabelBox(point, angle, textSize) {
+      const rad = (angle * Math.PI) / 180;
+      return roadLabelBoxAt(point, {
+        width:
+          textSize.width * Math.abs(Math.cos(rad)) +
+          textSize.height * Math.abs(Math.sin(rad)),
+        height:
+          textSize.width * Math.abs(Math.sin(rad)) +
+          textSize.height * Math.abs(Math.cos(rad)),
+      });
+    }
+
+    function placeSpot(candidateIndex, name, textSize, spot, allowOverlap = false) {
+      const { point, angle } = spot;
+      if (!isInViewport(point)) return false;
+      const box = projectLabelBox(point, angle, textSize);
+      if (obstacleBoxes.some((o) => boxIntersects(box, o))) return false;
+      if (!allowOverlap && usedLabelBoxes.some((o) => boxIntersects(box, o)))
+        return false;
+
+      const key = `${candidateIndex}|${Math.round(point.x)}|${Math.round(point.y)}|${Math.round(angle * 10)}`;
+      if (placedSpots.has(key)) return false;
+
+      placedSpots.add(key);
+      usedLabelBoxes.push(box);
+      layers.roadNames.addLayer(
+        createRoadNameLabel(map.containerPointToLatLng(point), name, angle),
+      );
+      return true;
+    }
+
+    // Pass 1: guarantee at least one visible label per visible road candidate.
+    for (let i = 0; i < roadNameCandidates.length; i++) {
+      const candidate = roadNameCandidates[i];
+      const name = candidate.name;
+      const textSize = estimateRoadLabelSize(name);
+      const spots = roadLabelSpotsPx(candidate, textSize.width, spacing).filter((s) =>
+        isInViewport(s.point),
+      );
+      if (spots.length === 0) continue;
+
+      for (const spot of spots) {
+        if (!placeSpot(i, name, textSize, spot, true)) continue;
+        const sameName = placedByName.get(name) || [];
+        sameName.push(spot.point);
+        placedByName.set(name, sameName);
+        break;
+      }
+    }
+
+    // Pass 2: place additional labels with collision limits for readability.
+    for (let i = 0; i < roadNameCandidates.length; i++) {
+      const candidate = roadNameCandidates[i];
       const name = candidate.name;
       const textSize = estimateRoadLabelSize(name);
       const sameName = placedByName.get(name) || [];
@@ -2005,34 +2061,20 @@ export function createMapController() {
 
       for (const spot of roadLabelSpotsPx(candidate, textSize.width, spacing)) {
         const { point, angle } = spot;
-        if (point.x < 0 || point.y < 0 || point.x > size.x || point.y > size.y)
-          continue;
+        if (!isInViewport(point)) continue;
         if (sameName.some((q) => q.distanceTo(point) < spacing * 0.7)) continue;
-        const rad = (angle * Math.PI) / 180;
-        const box = roadLabelBoxAt(point, {
-          width:
-            textSize.width * Math.abs(Math.cos(rad)) +
-            textSize.height * Math.abs(Math.sin(rad)),
-          height:
-            textSize.width * Math.abs(Math.sin(rad)) +
-            textSize.height * Math.abs(Math.cos(rad)),
-        });
-        if (obstacleBoxes.some((o) => boxIntersects(box, o))) continue;
-        if (usedLabelBoxes.some((o) => boxIntersects(box, o))) continue;
+        if (!placeSpot(i, name, textSize, spot)) continue;
         sameName.push(point);
-        usedLabelBoxes.push(box);
-        layers.roadNames.addLayer(
-          createRoadNameLabel(map.containerPointToLatLng(point), name, angle),
-        );
       }
     }
   }
 
   function mergePixelsForZoom(zoom) {
-    if (zoom <= 18) return 1400;
-    if (zoom === 19) return 520;
-    if (zoom === 20) return 340;
-    return 260;
+    if (zoom <= 17) return 900;
+    if (zoom === 18) return 520;
+    if (zoom === 19) return 360;
+    if (zoom === 20) return 260;
+    return 210;
   }
 
   function pixelsToMeters(px) {
