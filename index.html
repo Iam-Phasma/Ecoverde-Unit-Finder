@@ -11,7 +11,7 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
-    <link rel="stylesheet" href="css/style.css?v=20261003-2226" />
+    <link rel="stylesheet" href="css/style.css?v=20261003-2229" />
   </head>
   <body>
     <main>
@@ -129,6 +129,17 @@
         ></div>
         <div class="route-panel-section route-narrative-wrap">
           <div id="route-narrative" class="route-narrative"></div>
+          <button
+            type="button"
+            id="route-share"
+            class="route-share"
+            title="Copy a link to this route"
+          >
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
+              <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15.141 6 5.518 4.95a1.05 1.05 0 0 1 0 1.549l-5.612 5.088m-6.154-3.214v1.615a.95.95 0 0 0 1.525.845l5.108-4.251a1.1 1.1 0 0 0 0-1.646l-5.108-4.251a.95.95 0 0 0-1.525.846v1.7c-3.312 0-6 2.979-6 6.654v1.329a.7.7 0 0 0 1.344.353 5.174 5.174 0 0 1 4.652-3.191l.004-.003Z"/>
+            </svg>
+            <span>Share</span>
+          </button>
         </div>
         <div class="route-panel-section route-actions">
           <button
@@ -220,6 +231,6 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@lyket/widget@latest/dist/lyket.js?apiKey=pt_697795132193026632019e5e22420e"></script>
-    <script type="module" src="js/main.js?v=20261003-2218"></script>
+    <script type="module" src="js/main.js?v=20261003-2229"></script>
   </body>
 </html>

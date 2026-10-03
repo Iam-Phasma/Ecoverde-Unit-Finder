@@ -489,4 +489,64 @@ function setupWelcomeOverlay() {
   overlay.classList.remove("hidden");
 }
 
-setupWelcomeOverlay();
+const deepLinkParams = new URLSearchParams(location.search);
+const deepLinkBlock = (deepLinkParams.get("block") || "").trim();
+const deepLinkLot = (deepLinkParams.get("lot") || "").trim();
+
+function buildShareUrl() {
+  const block = controller.blockSelect.value;
+  const lot = controller.lotSelect.value;
+  const url = new URL(location.href);
+  url.search = "";
+  url.hash = "";
+  if (block) url.searchParams.set("block", block);
+  if (block && lot) url.searchParams.set("lot", lot);
+  return url.toString();
+}
+
+const routeShareButton = document.getElementById("route-share");
+routeShareButton?.addEventListener("click", async () => {
+  const url = buildShareUrl();
+  const label = routeShareButton.querySelector("span");
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(url);
+    ok = true;
+  } catch {
+    ok = window.prompt("Copy this link:", url) !== null;
+  }
+  if (ok && label) {
+    label.textContent = "Link copied";
+    setTimeout(() => (label.textContent = "Share"), 1800);
+  }
+});
+
+function applyDeepLink() {
+  const hasBlock = [...controller.blockSelect.options].some(
+    (o) => o.value === deepLinkBlock,
+  );
+  if (!hasBlock) return false;
+  controller.blockSelect.value = deepLinkBlock;
+  controller.blockSelect.dispatchEvent(new Event("change"));
+  if (deepLinkLot) {
+    const hasLot = [...controller.lotSelect.options].some(
+      (o) => o.value === deepLinkLot,
+    );
+    if (hasLot) controller.lotSelect.value = deepLinkLot;
+  }
+  controller.lotSelect.dispatchEvent(new Event("change"));
+  searchForm.requestSubmit();
+  return true;
+}
+
+if (deepLinkBlock) {
+  // Block options are populated asynchronously once map data loads.
+  if (!applyDeepLink()) {
+    const observer = new MutationObserver(() => {
+      if (applyDeepLink()) observer.disconnect();
+    });
+    observer.observe(controller.blockSelect, { childList: true });
+  }
+} else {
+  setupWelcomeOverlay();
+}

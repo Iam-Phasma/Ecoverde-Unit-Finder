@@ -812,6 +812,25 @@ main {
   min-height: 64px;
 }
 
+.route-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.route-share:hover {
+  color: #256640;
+}
+
 .route-road-name {
   color: #3a6fe0;
   font-weight: 700;
