@@ -206,9 +206,12 @@ function setupLyketOverrides() {
   const root = document.getElementById("lyket-button");
   if (!root) return;
   const popClassName = "lyket-like-pop";
+  const thanksClassName = "lyket-thanks-visible";
   let popTimer = null;
+  let thanksTimer = null;
   const isLiked = () => root.querySelector("button")?.classList.contains("css-fpg8om");
   let wasLiked = Boolean(isLiked());
+  let buttonClassObserver = null;
 
   function triggerLikePop() {
     const button = root.querySelector("button");
@@ -224,18 +227,55 @@ function setupLyketOverrides() {
     }, 420);
   }
 
+  function showThanksMessage() {
+    root.classList.remove(thanksClassName);
+    // Force reflow so repeated likes retrigger the message animation.
+    void root.offsetWidth;
+    root.classList.add(thanksClassName);
+    if (thanksTimer) clearTimeout(thanksTimer);
+    thanksTimer = setTimeout(() => {
+      root.classList.remove(thanksClassName);
+      thanksTimer = null;
+    }, 1500);
+  }
+
   applyLyketLayoutOverrides();
   setTimeout(applyLyketLayoutOverrides, 250);
   setTimeout(applyLyketLayoutOverrides, 1000);
   setTimeout(applyLyketLayoutOverrides, 2000);
 
-  const observer = new MutationObserver(() => {
-    applyLyketLayoutOverrides();
+  function syncLikedStateFromClass() {
     const likedNow = Boolean(isLiked());
-    if (!wasLiked && likedNow) triggerLikePop();
+    if (!wasLiked && likedNow) {
+      triggerLikePop();
+      showThanksMessage();
+    }
     wasLiked = likedNow;
+  }
+
+  function attachButtonClassObserver() {
+    if (buttonClassObserver) {
+      buttonClassObserver.disconnect();
+      buttonClassObserver = null;
+    }
+    const button = root.querySelector("button");
+    if (!button) return;
+    buttonClassObserver = new MutationObserver(() => {
+      syncLikedStateFromClass();
+    });
+    buttonClassObserver.observe(button, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    syncLikedStateFromClass();
+  }
+
+  attachButtonClassObserver();
+  const rootObserver = new MutationObserver(() => {
+    applyLyketLayoutOverrides();
+    attachButtonClassObserver();
   });
-  observer.observe(root, { subtree: true, childList: true, attributes: true });
+  rootObserver.observe(root, { subtree: true, childList: true });
 }
 
 function updateFindButtonState() {
