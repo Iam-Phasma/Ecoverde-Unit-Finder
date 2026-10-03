@@ -108,6 +108,10 @@ body {
   touch-action: manipulation;
 }
 
+.lyket-button.hidden {
+  display: none;
+}
+
 .lyket-button::after {
   content: attr(data-tooltip);
   position: absolute;

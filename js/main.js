@@ -147,12 +147,21 @@ function setFindIconHtml(svgMarkup) {
   icon.outerHTML = svgMarkup;
 }
 
+function setLyketButtonVisible(visible) {
+  const root = document.getElementById("lyket-button");
+  if (!root) return;
+  root.classList.toggle("hidden", !visible);
+  root.setAttribute("aria-hidden", visible ? "false" : "true");
+}
+
 function setFindIconForIdleState() {
   setFindIconHtml(FIND_ICON_SEARCH_SVG);
+  setLyketButtonVisible(true);
 }
 
 function setFindIconForSuccessfulSearch() {
   setFindIconHtml(FIND_ICON_SUCCESS_SVG);
+  setLyketButtonVisible(false);
 }
 
 function applyLyketLayoutOverrides() {
