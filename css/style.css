@@ -99,11 +99,13 @@ body {
   position: absolute;
   left: 1rem;
   bottom: 1rem;
-  z-index: 1000;
+  z-index: 1200;
   width: 42px;
   height: 42px;
   font-size: 24px;
   line-height: 1;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .lyket-button::after {
@@ -194,6 +196,26 @@ body {
 
 #lyket-button button.css-v5rf3y::before {
   background-color: #ffffff !important;
+}
+
+#lyket-button button.lyket-like-pop::before {
+  animation: lyket-like-pop 360ms cubic-bezier(0.22, 0.75, 0.25, 1) !important;
+  transform-origin: center !important;
+}
+
+@keyframes lyket-like-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.22);
+  }
+  70% {
+    transform: scale(0.92);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 #lyket-button > div > div {
@@ -1023,10 +1045,18 @@ main {
 
   .lyket-button {
     left: 0.65rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 3.55rem);
+    top: calc(env(safe-area-inset-top, 0px) + 0.65rem);
+    bottom: auto;
     width: 2.45rem;
     height: 2.45rem;
     font-size: 22px;
+  }
+
+  #lyket-button button {
+    width: 2.45rem !important;
+    height: 2.45rem !important;
+    min-width: 2.45rem !important;
+    min-height: 2.45rem !important;
   }
 
   .lyket-button::after {

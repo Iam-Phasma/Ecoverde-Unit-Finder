@@ -205,12 +205,36 @@ function applyLyketLayoutOverrides() {
 function setupLyketOverrides() {
   const root = document.getElementById("lyket-button");
   if (!root) return;
+  const popClassName = "lyket-like-pop";
+  let popTimer = null;
+  const isLiked = () => root.querySelector("button")?.classList.contains("css-fpg8om");
+  let wasLiked = Boolean(isLiked());
+
+  function triggerLikePop() {
+    const button = root.querySelector("button");
+    if (!button) return;
+    button.classList.remove(popClassName);
+    // Force reflow so repeated likes retrigger the animation reliably.
+    void button.offsetWidth;
+    button.classList.add(popClassName);
+    if (popTimer) clearTimeout(popTimer);
+    popTimer = setTimeout(() => {
+      button.classList.remove(popClassName);
+      popTimer = null;
+    }, 420);
+  }
+
   applyLyketLayoutOverrides();
   setTimeout(applyLyketLayoutOverrides, 250);
   setTimeout(applyLyketLayoutOverrides, 1000);
   setTimeout(applyLyketLayoutOverrides, 2000);
 
-  const observer = new MutationObserver(() => applyLyketLayoutOverrides());
+  const observer = new MutationObserver(() => {
+    applyLyketLayoutOverrides();
+    const likedNow = Boolean(isLiked());
+    if (!wasLiked && likedNow) triggerLikePop();
+    wasLiked = likedNow;
+  });
   observer.observe(root, { subtree: true, childList: true, attributes: true });
 }
 
