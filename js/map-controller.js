@@ -295,6 +295,10 @@ export function createMapController() {
     updateAmenitiesClusters();
     bringGroupToFront(layers.roadNames);
   });
+  map.on("moveend", () => {
+    refreshRoadNameLabels();
+    bringGroupToFront(layers.roadNames);
+  });
   map.on("zoomanim", (event) => {
     applyTreeZoomAnimationScale(2 ** (event.zoom - map.getZoom()));
   });
