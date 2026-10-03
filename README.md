@@ -9,7 +9,7 @@ Pages: https://iam-phasma.github.io/Ecoverde-Unit-Finder/
 
 - Search homes by **Block** and **Lot**.
 - Highlight the selected unit and focus the map on it.
-- Show route distance and estimated travel times for car, bicycle, and walking.
+- Show route distance and estimated travel times for car, motorcycle, bicycle, and walking (desktop/tablet view).
 - Drag the start point to simulate a different origin.
 - Re-route by marking a road segment to avoid, then tap the marker again to remove that avoidance.
 - Use optional overlays like street names, obstacles, and administrative points.

@@ -651,12 +651,7 @@ main {
 }
 
 .route-road-name {
-  display: inline;
-  padding: 0 0.32em;
-  border-radius: 5px;
-  background: #3a6fe0;
-  color: #fff;
-  border: 1px solid #2b59c3;
+  color: #3a6fe0;
   font-weight: 700;
   line-height: inherit;
 }
@@ -697,6 +692,7 @@ main {
   font-family: inherit;
   font-size: 0.9rem;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
   width: 116px;
   text-align: center;
@@ -920,6 +916,10 @@ main {
 
   .route-actions button {
     flex: 1;
+    width: auto;
+    min-width: 0;
+    padding: 0.5rem 0.42rem;
+    font-size: 0.78rem;
   }
 }
 

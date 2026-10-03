@@ -73,14 +73,15 @@ function parkingTooltipLabel(props = {}) {
 }
 
 export function createMapController() {
+  const isPhoneViewport = window.matchMedia("(max-width: 720px)");
   const bakedRenderer = L.canvas({ padding: 1.2 });
   const buildingRenderer = L.svg({ padding: 1.2 });
   const routeRenderer = L.svg({ padding: 1.2 });
   const map = L.map("map", {
     zoomControl: false,
     attributionControl: false,
-    minZoom: 15,
-    maxZoom: 22,
+    minZoom: isPhoneViewport.matches ? 17 : 15,
+    maxZoom: isPhoneViewport.matches ? 20 : 22,
     preferCanvas: true,
     renderer: bakedRenderer,
     zoomAnimation: true,
@@ -114,9 +115,8 @@ export function createMapController() {
       { passive: false },
     );
   }
-
   installSingleStepWheelZoom();
-  const isPhoneViewport = window.matchMedia("(max-width: 720px)");
+  installSingleStepWheelZoom();
 
   const navControl = L.control({ position: "bottomright" });
   navControl.onAdd = function () {
@@ -238,6 +238,23 @@ export function createMapController() {
   let routeDebugEnabled = readRouteDebugEnabled();
   let activeRoutePathLatLngs = null;
   let administrativeSourceMarkers = [];
+
+  function shouldHideVehicleEtaRows() {
+    return panelMode === "block" || isPhoneViewport.matches;
+  }
+
+  function syncVehicleEtaRowsVisibility() {
+    if (routeEtaRowsEl) routeEtaRowsEl.hidden = shouldHideVehicleEtaRows();
+  }
+
+  const handlePhoneViewportChange = () => {
+    if (panelMode === "route") syncVehicleEtaRowsVisibility();
+  };
+  if (typeof isPhoneViewport.addEventListener === "function") {
+    isPhoneViewport.addEventListener("change", handlePhoneViewportChange);
+  } else if (typeof isPhoneViewport.addListener === "function") {
+    isPhoneViewport.addListener(handlePhoneViewportChange);
+  }
   let administrativeClusterMarkers = [];
   let amenitiesSourceMarkers = [];
   let amenitiesClusterMarkers = [];
@@ -2605,6 +2622,7 @@ export function createMapController() {
       })
       .join("");
     routeEtaRowsEl.innerHTML = rows;
+    syncVehicleEtaRowsVisibility();
 
     routeNarrativeEl.innerHTML = buildNarrative(
       pathLatLngs,
@@ -2636,7 +2654,7 @@ export function createMapController() {
     const isBlockMode = mode === "block";
     routePanel.classList.toggle("route-panel--block", isBlockMode);
 
-    if (routeEtaRowsEl) routeEtaRowsEl.hidden = isBlockMode;
+    syncVehicleEtaRowsVisibility();
     const narrativeWrap = routeNarrativeEl?.closest(".route-narrative-wrap");
     if (narrativeWrap) narrativeWrap.hidden = isBlockMode;
     if (routeRerouteBtn) routeRerouteBtn.hidden = isBlockMode;

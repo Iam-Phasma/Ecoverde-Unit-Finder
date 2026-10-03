@@ -59,6 +59,10 @@ const layerDecoration = document.getElementById("layer-decoration");
 const layerDecorationOption = document.getElementById("layer-decoration-option");
 const routeClearButton = document.getElementById("route-clear");
 const isPhoneDevice = detectPhoneDevice();
+const FIND_ICON_SEARCH_SVG =
+  '<svg class="find-toggle-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="m21 21-3.5-3.5M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>';
+const FIND_ICON_SUCCESS_SVG =
+  '<svg class="find-toggle-icon w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 11h2v5m-2 0h4m-2.592-8.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>';
 
 function defaultLayerPrefs() {
   return isPhoneDevice
@@ -122,6 +126,20 @@ function setFindLabel(text) {
     text === "View" ? "View selected block or lot" : "Find selected block or lot";
 }
 
+function setFindIconHtml(svgMarkup) {
+  const icon = findButton.querySelector(".find-toggle-icon");
+  if (!icon) return;
+  icon.outerHTML = svgMarkup;
+}
+
+function setFindIconForIdleState() {
+  setFindIconHtml(FIND_ICON_SEARCH_SVG);
+}
+
+function setFindIconForSuccessfulSearch() {
+  setFindIconHtml(FIND_ICON_SUCCESS_SVG);
+}
+
 function updateFindButtonState() {
   const hasBlock = Boolean(controller.blockSelect.value);
   findButton.disabled = !hasBlock;
@@ -175,13 +193,18 @@ layerDecoration.addEventListener("change", () => {
 
 controller.blockSelect.addEventListener("change", () => {
   setFindLabel("Find");
+  setFindIconForIdleState();
   updateFindButtonState();
 });
 controller.lotSelect.addEventListener("change", () => {
   setFindLabel("Find");
+  setFindIconForIdleState();
   updateFindButtonState();
 });
-routeClearButton?.addEventListener("click", resetSelectionInputs);
+routeClearButton?.addEventListener("click", () => {
+  setFindIconForIdleState();
+  resetSelectionInputs();
+});
 
 const layerPrefs = readLayerPrefs();
 layerObstacle.checked = layerPrefs.obstacle;
@@ -212,6 +235,7 @@ controller.setLayerVisibility(
 );
 
 if (isPhoneDevice) writeLayerPrefs();
+setFindIconForIdleState();
 updateFindButtonState();
 
 searchForm.addEventListener("submit", (e) => {
@@ -221,6 +245,7 @@ searchForm.addEventListener("submit", (e) => {
   if (!block) {
     controller.clearSelection();
     setFindLabel("Find");
+    setFindIconForIdleState();
     return;
   }
 
@@ -229,6 +254,7 @@ searchForm.addEventListener("submit", (e) => {
     if (blockEntry) {
       controller.highlightCityBlock(blockEntry);
       setFindLabel("View");
+      setFindIconForSuccessfulSearch();
     } else {
       console.warn(`No block boundary matching Block ${block}.`);
     }
@@ -240,6 +266,7 @@ searchForm.addEventListener("submit", (e) => {
   if (entry) {
     controller.highlightBuilding(entry);
     setFindLabel("View");
+    setFindIconForSuccessfulSearch();
   } else {
     console.warn(`No unit matching Block ${block}, Lot ${lot}.`);
   }
