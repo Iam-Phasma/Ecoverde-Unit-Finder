@@ -446,10 +446,13 @@ function setupWelcomeOverlay() {
     findEl.disabled = !blockEl.value;
   }
 
+  const WELCOME_FADE_MS = 300;
+
   function close() {
     document.removeEventListener("keydown", onKeydown);
+    document.body.classList.remove("welcome-open");
     overlay.classList.add("welcome--leaving");
-    setTimeout(() => overlay.classList.add("hidden"), 300);
+    setTimeout(() => overlay.classList.add("hidden"), WELCOME_FADE_MS);
   }
 
   function onKeydown(e) {
@@ -474,13 +477,15 @@ function setupWelcomeOverlay() {
     controller.lotSelect.value = lotEl.value;
     controller.lotSelect.dispatchEvent(new Event("change"));
     close();
-    searchForm.requestSubmit();
+    // let the overlay finish fading before the route computation and map animation start
+    setTimeout(() => searchForm.requestSubmit(), WELCOME_FADE_MS + 50);
   });
 
   skipEl.addEventListener("click", close);
   document.addEventListener("keydown", onKeydown);
 
   syncOptions();
+  document.body.classList.add("welcome-open");
   overlay.classList.remove("hidden");
 }
 

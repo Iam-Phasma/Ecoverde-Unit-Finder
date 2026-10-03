@@ -2718,20 +2718,20 @@ export function createMapController() {
     if (routeRerouteBtn) routeRerouteBtn.hidden = isBlockMode;
 
     if (routeClearBtn) {
-      routeClearBtn.textContent = isBlockMode ? "Close" : "Clear route";
+      routeClearBtn.textContent = isBlockMode ? "Close" : "End Route";
       routeClearBtn.setAttribute(
         "aria-label",
-        isBlockMode ? "Close block selection" : "Clear route",
+        isBlockMode ? "Close block selection" : "End route",
       );
       routeClearBtn.title = isBlockMode
         ? "Clear block selection"
-        : "Clear route and selection";
+        : "End route and clear selection";
     }
 
     if (routeDismissBtn) {
-      routeDismissBtn.textContent = "Dismiss";
-      routeDismissBtn.setAttribute("aria-label", "Dismiss");
-      routeDismissBtn.title = "Close panel";
+      routeDismissBtn.textContent = "Collapse";
+      routeDismissBtn.setAttribute("aria-label", "Collapse");
+      routeDismissBtn.title = "Collapse panel";
     }
   }
 

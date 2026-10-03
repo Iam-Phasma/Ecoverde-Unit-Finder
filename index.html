@@ -11,7 +11,7 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
-    <link rel="stylesheet" href="css/style.css?v=20261003-2205" />
+    <link rel="stylesheet" href="css/style.css?v=20261003-2226" />
   </head>
   <body>
     <main>
@@ -50,14 +50,13 @@
           </svg>
           <span class="find-toggle-label">Find</span>
         </button>
-        <span class="search-separator" aria-hidden="true"></span>
         <div class="layers-menu">
           <button
             type="button"
             id="layers-toggle"
             aria-haspopup="true"
             aria-expanded="false"
-            aria-label="Layer"
+            aria-label="Layers"
             title="Show or hide map layers"
           >
             <svg
@@ -77,16 +76,16 @@
                 d="M5.005 11.19V12l6.998 4.042L19 12v-.81M5 16.15v.81L11.997 21l6.998-4.042v-.81M12.003 3 5.005 7.042l6.998 4.042L19 7.042 12.003 3Z"
               />
             </svg>
-            <span class="layers-toggle-label">Layer</span>
+            <span class="layers-toggle-label">Layers</span>
           </button>
           <div id="layers-panel" class="layers-panel hidden">
             <label>
               <input type="checkbox" id="layer-obstacle" />
-              Obstacle
+              Obstacles
             </label>
             <label>
               <input type="checkbox" id="layer-administrative" />
-              Administrative
+              Buildings
             </label>
             <label>
               <input type="checkbox" id="layer-amenities" checked />
@@ -98,7 +97,7 @@
             </label>
             <label id="layer-decoration-option">
               <input type="checkbox" id="layer-decoration" checked />
-              Decoration
+              Decorations
             </label>
           </div>
         </div>
@@ -136,10 +135,10 @@
             type="button"
             id="route-clear"
             class="eta-clear"
-            aria-label="Clear route"
-            title="Clear route and selection"
+            aria-label="End route"
+            title="End route and clear selection"
           >
-            Clear route
+            End Route
           </button>
           <button
             type="button"
@@ -154,10 +153,10 @@
             type="button"
             id="route-dismiss"
             class="eta-dismiss"
-            aria-label="Dismiss"
-            title="Close route panel"
+            aria-label="Collapse"
+            title="Collapse route panel"
           >
-            Dismiss
+            Collapse
           </button>
         </div>
       </aside>
@@ -221,6 +220,6 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@lyket/widget@latest/dist/lyket.js?apiKey=pt_697795132193026632019e5e22420e"></script>
-    <script type="module" src="js/main.js?v=20261003-2157"></script>
+    <script type="module" src="js/main.js?v=20261003-2218"></script>
   </body>
 </html>
