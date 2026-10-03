@@ -13,7 +13,22 @@ if (GITHUB_PAGES_HOST_PATTERN.test(window.location.hostname)) {
   window.location.replace(redirectUrl);
 }
 
-if ("serviceWorker" in navigator) {
+const isLocalhost =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
+
+if ("serviceWorker" in navigator && isLocalhost) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) registration.unregister();
+  });
+  if ("caches" in window) {
+    caches.keys().then((keys) => {
+      for (const key of keys) caches.delete(key);
+    });
+  }
+}
+
+if ("serviceWorker" in navigator && !isLocalhost) {
   const registerServiceWorker = () => {
     navigator.serviceWorker
       .register("sw.js", { updateViaCache: "none" })
@@ -140,6 +155,65 @@ function setFindIconForSuccessfulSearch() {
   setFindIconHtml(FIND_ICON_SUCCESS_SVG);
 }
 
+function applyLyketLayoutOverrides() {
+  const root = document.getElementById("lyket-button");
+  if (!root) return;
+  const wrap = root.firstElementChild;
+  const button = root.querySelector("button");
+  const counter = wrap && wrap.children ? wrap.children[1] : null;
+  const ripple = button?.querySelector("div");
+
+  if (wrap) {
+    wrap.style.display = "inline-flex";
+    wrap.style.alignItems = "center";
+    wrap.style.justifyContent = "flex-start";
+    wrap.style.gap = "4px";
+    wrap.style.columnGap = "4px";
+    wrap.style.width = "auto";
+  }
+
+  if (button) {
+    button.style.margin = "0";
+    button.style.padding = "0";
+    button.style.width = "auto";
+    button.style.minWidth = "0";
+    button.style.transform = "none";
+    button.style.transition = "none";
+    button.style.animation = "none";
+  }
+
+  if (counter) {
+    counter.style.margin = "0";
+    counter.style.marginLeft = "0";
+    counter.style.padding = "0";
+    counter.style.left = "0";
+    counter.style.transform = "none";
+    counter.style.minWidth = "0";
+    counter.style.width = "auto";
+    counter.style.display = "block";
+  }
+
+  if (ripple) {
+    ripple.style.display = "none";
+    ripple.style.width = "0";
+    ripple.style.height = "0";
+    ripple.style.margin = "0";
+    ripple.style.padding = "0";
+  }
+}
+
+function setupLyketOverrides() {
+  const root = document.getElementById("lyket-button");
+  if (!root) return;
+  applyLyketLayoutOverrides();
+  setTimeout(applyLyketLayoutOverrides, 250);
+  setTimeout(applyLyketLayoutOverrides, 1000);
+  setTimeout(applyLyketLayoutOverrides, 2000);
+
+  const observer = new MutationObserver(() => applyLyketLayoutOverrides());
+  observer.observe(root, { subtree: true, childList: true, attributes: true });
+}
+
 function updateFindButtonState() {
   const hasBlock = Boolean(controller.blockSelect.value);
   findButton.disabled = !hasBlock;
@@ -236,6 +310,7 @@ controller.setLayerVisibility(
 
 if (isPhoneDevice) writeLayerPrefs();
 setFindIconForIdleState();
+setupLyketOverrides();
 updateFindButtonState();
 
 searchForm.addEventListener("submit", (e) => {

@@ -11,7 +11,7 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
-    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/style.css?v=20261003-1804" />
   </head>
   <body>
     <main>
@@ -71,6 +71,19 @@
           </div>
         </div>
       </form>
+      <div
+        id="lyket-button"
+        class="lyket-button"
+        aria-label="Like this map"
+        data-tooltip="Like this map"
+        data-lyket-type="like"
+        data-lyket-id="map-like"
+        data-lyket-namespace="ecoverde-unit-finder"
+        data-lyket-color-primary="#c23d56"
+        data-lyket-color-background="transparent"
+        data-lyket-color-icon="#6a5d4b"
+        data-lyket-show-counter-from="999999"
+      ></div>
 
       <aside id="route-panel" class="route-panel hidden" aria-live="polite">
         <div class="route-panel-section route-panel-head">
@@ -112,6 +125,7 @@
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="js/main.js"></script>
+    <script src="https://unpkg.com/@lyket/widget@latest/dist/lyket.js?apiKey=pt_697795132193026632019e5e22420e"></script>
+    <script type="module" src="js/main.js?v=20261003-1804"></script>
   </body>
 </html>

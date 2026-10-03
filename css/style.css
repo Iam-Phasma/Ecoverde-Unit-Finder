@@ -95,6 +95,117 @@ body {
   background: var(--building-line);
 }
 
+.lyket-button {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 1000;
+  width: 42px;
+  height: 42px;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.lyket-button::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 0.45rem);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0.28rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(28, 30, 34, 0.9);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.lyket-button:hover::after,
+.lyket-button:focus-within::after {
+  opacity: 1;
+}
+
+#lyket-button > div {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.22rem !important;
+  column-gap: 0.22rem !important;
+}
+
+#lyket-button button {
+  display: inline-flex !important;
+  align-items: center !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+#lyket-button button *,
+#lyket-button button::before,
+#lyket-button button::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+#lyket-button button > svg {
+  display: none !important;
+}
+
+#lyket-button button > div {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#lyket-button button::before {
+  content: "";
+  width: 22px;
+  height: 22px;
+  display: inline-block;
+  background-color: #ffffff !important;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12.01 6.001C6.5 1 1 8 5.782 13.001L12.011 20l6.23-7C23 8 17.5 1 12.01 6.002Z'/%3E%3C/svg%3E")
+    center / contain no-repeat !important;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12.01 6.001C6.5 1 1 8 5.782 13.001L12.011 20l6.23-7C23 8 17.5 1 12.01 6.002Z'/%3E%3C/svg%3E")
+    center / contain no-repeat !important;
+}
+
+#lyket-button button.css-fpg8om::before {
+  background: center / contain no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23e11d48' stroke='%23ffffff' stroke-width='1.6' stroke-linejoin='round' d='m12.75 20.66 6.184-7.098c2.677-2.884 2.559-6.506.754-8.705-.898-1.095-2.206-1.816-3.72-1.855-1.293-.034-2.652.43-3.963 1.442-1.315-1.012-2.678-1.476-3.973-1.442-1.515.04-2.825.76-3.724 1.855-1.806 2.201-1.915 5.823.772 8.706l6.183 7.097c.19.216.46.34.743.34a.985.985 0 0 0 .743-.34Z'/%3E%3C/svg%3E")
+    !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+}
+
+#lyket-button button.css-v5rf3y::before {
+  background-color: #ffffff !important;
+}
+
+#lyket-button > div > div {
+  display: none !important;
+  color: var(--ink) !important;
+  font-family: inherit !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  line-height: 1 !important;
+  margin-left: 0 !important;
+}
+
 .layers-menu {
   position: relative;
 }
@@ -907,6 +1018,18 @@ main {
   }
 
   .recenter-control {
+    display: none;
+  }
+
+  .lyket-button {
+    left: 0.65rem;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 3.55rem);
+    width: 2.45rem;
+    height: 2.45rem;
+    font-size: 22px;
+  }
+
+  .lyket-button::after {
     display: none;
   }
 
