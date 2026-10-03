@@ -114,6 +114,14 @@ function writeLayerPrefs() {
   }
 }
 
+const findLabel = findButton.querySelector(".find-toggle-label");
+
+function setFindLabel(text) {
+  if (findLabel) findLabel.textContent = text;
+  findButton.title =
+    text === "View" ? "View selected block or lot" : "Find selected block or lot";
+}
+
 function updateFindButtonState() {
   const hasBlock = Boolean(controller.blockSelect.value);
   findButton.disabled = !hasBlock;
@@ -165,8 +173,14 @@ layerDecoration.addEventListener("change", () => {
   writeLayerPrefs();
 });
 
-controller.blockSelect.addEventListener("change", updateFindButtonState);
-controller.lotSelect.addEventListener("change", updateFindButtonState);
+controller.blockSelect.addEventListener("change", () => {
+  setFindLabel("Find");
+  updateFindButtonState();
+});
+controller.lotSelect.addEventListener("change", () => {
+  setFindLabel("Find");
+  updateFindButtonState();
+});
 routeClearButton?.addEventListener("click", resetSelectionInputs);
 
 const layerPrefs = readLayerPrefs();
@@ -206,6 +220,7 @@ searchForm.addEventListener("submit", (e) => {
   const lot = controller.lotSelect.value;
   if (!block) {
     controller.clearSelection();
+    setFindLabel("Find");
     return;
   }
 
@@ -213,6 +228,7 @@ searchForm.addEventListener("submit", (e) => {
     const blockEntry = controller.cityBlockLayersByKey.get(block);
     if (blockEntry) {
       controller.highlightCityBlock(blockEntry);
+      setFindLabel("View");
     } else {
       console.warn(`No block boundary matching Block ${block}.`);
     }
@@ -223,6 +239,7 @@ searchForm.addEventListener("submit", (e) => {
 
   if (entry) {
     controller.highlightBuilding(entry);
+    setFindLabel("View");
   } else {
     console.warn(`No unit matching Block ${block}, Lot ${lot}.`);
   }
