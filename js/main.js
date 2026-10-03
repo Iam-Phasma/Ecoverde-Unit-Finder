@@ -431,11 +431,17 @@ function setupWelcomeOverlay() {
   const findEl = document.getElementById("welcome-find");
   const skipEl = document.getElementById("welcome-skip");
 
+  function copyOptions(source, target, placeholder) {
+    target.innerHTML = source.innerHTML;
+    const first = target.options[0];
+    if (first && first.value === "") first.textContent = placeholder;
+  }
+
   function syncOptions() {
     const current = blockEl.value;
-    blockEl.innerHTML = controller.blockSelect.innerHTML;
+    copyOptions(controller.blockSelect, blockEl, "Select Block");
     blockEl.value = current;
-    lotEl.innerHTML = controller.lotSelect.innerHTML;
+    copyOptions(controller.lotSelect, lotEl, "Select Lot");
     lotEl.disabled = controller.lotSelect.disabled;
     findEl.disabled = !blockEl.value;
   }
@@ -457,7 +463,7 @@ function setupWelcomeOverlay() {
   blockEl.addEventListener("change", () => {
     controller.blockSelect.value = blockEl.value;
     controller.blockSelect.dispatchEvent(new Event("change"));
-    lotEl.innerHTML = controller.lotSelect.innerHTML;
+    copyOptions(controller.lotSelect, lotEl, "Select Lot");
     lotEl.disabled = controller.lotSelect.disabled;
     findEl.disabled = !blockEl.value;
   });

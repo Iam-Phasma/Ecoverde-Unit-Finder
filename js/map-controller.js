@@ -559,6 +559,18 @@ export function createMapController() {
     // pad by 50% so panning can push the subdivision halfway off-screen, but never fully away
     map.setMaxBounds(dataBounds.pad(0.5));
     updateMinZoom();
+    if (gateMarker) {
+      // +log2(1.5) zoom levels magnifies the view by 50%
+      map.setView(
+        gateMarker.getLatLng(),
+        map.getMaxZoom() - 3 + Math.log2(1.5),
+        { animate: false },
+      );
+      // shift the view north and west so the gate sits near the bottom, slightly right of center
+      map.panBy([-map.getSize().x * 0.1, -map.getSize().y * 0.3], {
+        animate: false,
+      });
+    }
     window.addEventListener("resize", updateMinZoom);
     populateObstaclePins(collection.features);
     populateAdministrativePins(collection.features);

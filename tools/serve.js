@@ -13,6 +13,7 @@ const mime = {
   ".css": "text/css",
   ".json": "application/json",
   ".geojson": "application/json",
+  ".svg": "image/svg+xml",
 };
 
 http
