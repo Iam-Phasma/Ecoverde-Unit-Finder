@@ -2,3 +2,5 @@
 
 # Temporary response dumps from manual fetch/debug workflows.
 /body*.txt
+# Local-only developer notes.
+/DEV_NOTES.md

@@ -267,7 +267,7 @@ main {
   display: block;
   width: 100%;
   height: 100%;
-  background-image: url("./tree2.svg");
+  background-image: url("../assets/tree2.svg");
   background-repeat: no-repeat;
   background-size: contain;
   background-position: center bottom;
@@ -278,11 +278,11 @@ main {
 }
 
 .tree-icon__glyph.tree-icon--asset1 {
-  background-image: url("./tree1.svg");
+  background-image: url("../assets/tree1.svg");
 }
 
 .tree-icon__glyph.tree-icon--asset2 {
-  background-image: url("./tree2.svg");
+  background-image: url("../assets/tree2.svg");
 }
 
 .tree-icon__glyph.tree-icon--flip {

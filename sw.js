@@ -1,11 +1,11 @@
-const STATIC_CACHE = "ecoverde-static-v4";
-const RUNTIME_CACHE = "ecoverde-runtime-v4";
+const STATIC_CACHE = "ecoverde-static-v5";
+const RUNTIME_CACHE = "ecoverde-runtime-v5";
 
 const PRECACHE_URLS = [
   "./",
   "index.html",
-  "style.css",
-  "favicon.svg",
+  "css/style.css",
+  "assets/favicon.svg",
   "js/main.js",
   "js/map-controller.js",
   "js/graph.js",
