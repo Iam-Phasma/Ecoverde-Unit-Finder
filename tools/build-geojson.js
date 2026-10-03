@@ -63,13 +63,18 @@ function isPointInsideSubdivision(lon, lat) {
   );
 }
 
-/** Parses a "B18 L16" style name into { block, lot }. */
+/** Parses a "B18 L16" / "B14A L38" style name into { block, lot }. */
 function parseBlockLot(tags) {
   const name = tags.name || "";
-  const match = name.match(/B\s*(\d+)\s*L\s*(\d+)/i);
-  if (match) return { block: match[1], lot: match[2] };
+  const match = name.match(
+    /\bB(?:LOCK)?\s*([0-9]+[A-Z]?)\s*L(?:OT)?\s*([0-9]+[A-Z]?)\b/i,
+  );
+  if (match) return { block: match[1].toUpperCase(), lot: match[2].toUpperCase() };
   if (tags["addr:lot"])
-    return { block: tags["addr:block"] || null, lot: tags["addr:lot"] };
+    return {
+      block: tags["addr:block"] ? String(tags["addr:block"]).toUpperCase() : null,
+      lot: String(tags["addr:lot"]).toUpperCase(),
+    };
   return { block: null, lot: null };
 }
 
