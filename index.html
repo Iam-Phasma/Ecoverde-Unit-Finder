@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ecoverde Homes Unit Finder</title>
+    <title>Ecoverde Homes Rosario Unit Finder</title>
     <link rel="preconnect" href="https://unpkg.com" crossorigin />
     <link rel="dns-prefetch" href="https://unpkg.com" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
@@ -61,8 +61,8 @@
               Amenities
             </label>
             <label>
-              <input type="checkbox" id="layer-road-names" />
-              Road names
+              <input type="checkbox" id="layer-road-names" checked />
+              Street names
             </label>
             <label id="layer-decoration-option">
               <input type="checkbox" id="layer-decoration" checked />
@@ -93,6 +93,22 @@
           </button>
         </div>
       </aside>
+      <div id="welcome" class="welcome hidden" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+        <form id="welcome-form" class="welcome-card" autocomplete="off">
+          <h1 id="welcome-title">Ecoverde Homes Rosario</h1>
+          <p>Find a unit by block and lot, or explore the map.</p>
+          <div class="welcome-fields">
+            <select id="welcome-block" aria-label="Block">
+              <option value="">Block</option>
+            </select>
+            <select id="welcome-lot" aria-label="Lot" disabled>
+              <option value="">Lot</option>
+            </select>
+            <button type="submit" id="welcome-find" disabled>Find</button>
+          </div>
+          <button type="button" id="welcome-skip" class="welcome-skip">Skip &amp; explore the map</button>
+        </form>
+      </div>
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

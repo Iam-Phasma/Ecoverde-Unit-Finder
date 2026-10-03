@@ -1858,18 +1858,67 @@ export function createMapController() {
     if (!Array.isArray(latlngs) || latlngs.length === 0) return null;
 
     const flat = Array.isArray(latlngs[0]) ? latlngs.flat() : latlngs;
-    if (!flat.length) return null;
-    const mid = flat[Math.floor(flat.length / 2)];
-    if (!mid) return null;
-
-    return { name, latlng: mid };
+    if (flat.length < 2) return null;
+    return { name, latlngs: flat };
   }
 
-  function createRoadNameLabel(latlng, name) {
+  function pointAlongPx(pts, cum, d) {
+    let i = 1;
+    while (i < pts.length - 1 && cum[i] < d) i++;
+    const segLen = cum[i] - cum[i - 1];
+    const t = segLen > 0 ? (d - cum[i - 1]) / segLen : 0;
+    return L.point(
+      pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t,
+      pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t,
+    );
+  }
+
+  // Label positions along one road: centred first, then repeated at a fixed screen spacing.
+  function roadLabelSpotsPx(candidate, textWidth, spacing) {
+    const pts = candidate.latlngs.map((ll) => map.latLngToContainerPoint(ll));
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++)
+      cum.push(cum[i - 1] + pts[i - 1].distanceTo(pts[i]));
+    const total = cum[cum.length - 1];
+    const half = textWidth / 2 + 4;
+    if (total < textWidth + 8) return [];
+
+    const offsets = [0];
+    for (let k = 1; total / 2 - k * spacing >= half; k++) offsets.push(k * spacing, -k * spacing);
+
+    const spots = [];
+    for (const off of offsets) {
+      const d = total / 2 + off;
+      if (d < half || d > total - half) continue;
+      const a = pointAlongPx(pts, cum, d - textWidth / 2);
+      const b = pointAlongPx(pts, cum, d + textWidth / 2);
+      const chord = a.distanceTo(b);
+      if (chord < textWidth * 0.9) continue;
+      let bent = false;
+      for (let i = 0; i < pts.length; i++) {
+        if (cum[i] <= d - textWidth / 2 || cum[i] >= d + textWidth / 2) continue;
+        const dev =
+          Math.abs((b.x - a.x) * (a.y - pts[i].y) - (a.x - pts[i].x) * (b.y - a.y)) / chord;
+        if (dev > textWidth * 0.1) {
+          bent = true;
+          break;
+        }
+      }
+      if (bent) continue;
+      let deg = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+      if (deg > 90) deg -= 180;
+      else if (deg < -90) deg += 180;
+      spots.push({ point: pointAlongPx(pts, cum, d), angle: deg });
+    }
+    return spots;
+  }
+
+  function createRoadNameLabel(latlng, name, angleDeg) {
     return L.marker(latlng, {
       icon: L.divIcon({
         className: "road-name-label",
-        html: `<span class="road-name-text">${escapeHtml(name)}</span>`,
+        html: `<span class="road-name-text" style="transform: translate(-50%, -50%) rotate(${angleDeg.toFixed(1)}deg)">${escapeHtml(name)}</span>`,
+        iconSize: [0, 0],
       }),
       interactive: false,
       keyboard: false,
@@ -1879,8 +1928,8 @@ export function createMapController() {
 
   function estimateRoadLabelSize(name) {
     const text = String(name || "");
-    const width = Math.max(56, Math.min(210, text.length * 7.1 + 18));
-    return { width, height: 24 };
+    const width = Math.max(30, Math.min(200, text.length * 6.2 + 8));
+    return { width, height: 14 };
   }
 
   function boxIntersects(a, b) {
@@ -1920,80 +1969,53 @@ export function createMapController() {
     return boxes;
   }
 
-  function findRoadLabelPlacement(latlng, name, obstacleBoxes, usedLabelBoxes) {
-    const center = map.latLngToContainerPoint(latlng);
-    const size = estimateRoadLabelSize(name);
-    const offsets = [
-      [0, 0],
-      [0, -30],
-      [0, 30],
-      [30, 0],
-      [-30, 0],
-      [24, -24],
-      [-24, -24],
-      [24, 24],
-      [-24, 24],
-      [42, 0],
-      [-42, 0],
-      [0, -42],
-      [0, 42],
-    ];
-
-    for (const [dx, dy] of offsets) {
-      const candidate = L.point(center.x + dx, center.y + dy);
-      const box = roadLabelBoxAt(candidate, size);
-      const blockedByObstacle = obstacleBoxes.some((b) =>
-        boxIntersects(box, b),
-      );
-      if (blockedByObstacle) continue;
-      const blockedByLabel = usedLabelBoxes.some((b) => boxIntersects(box, b));
-      if (blockedByLabel) continue;
-      return { latlng: map.containerPointToLatLng(candidate), box };
-    }
-
-    return null;
-  }
-
   function refreshRoadNameLabels() {
     layers.roadNames.clearLayers();
     if (!map.hasLayer(layers.roadNames) || roadNameCandidates.length === 0)
       return;
 
-    const thresholdMeters = pixelsToMeters(mergePixelsForZoom(map.getZoom()));
+    const spacing = mergePixelsForZoom(map.getZoom());
     const obstacleBoxes = collectObstacleBoxesPx();
     const usedLabelBoxes = [];
-    const byName = new Map();
-    for (const candidate of roadNameCandidates) {
-      if (!byName.has(candidate.name)) byName.set(candidate.name, []);
-      byName.get(candidate.name).push(candidate.latlng);
-    }
+    const placedByName = new Map();
+    const size = map.getSize();
 
-    for (const [name, points] of byName) {
-      const kept = [];
-      for (const point of points) {
-        const tooClose = kept.some(
-          (k) => k.distanceTo(point) < thresholdMeters,
+    for (const candidate of roadNameCandidates) {
+      const name = candidate.name;
+      const textSize = estimateRoadLabelSize(name);
+      const sameName = placedByName.get(name) || [];
+      placedByName.set(name, sameName);
+
+      for (const spot of roadLabelSpotsPx(candidate, textSize.width, spacing)) {
+        const { point, angle } = spot;
+        if (point.x < 0 || point.y < 0 || point.x > size.x || point.y > size.y)
+          continue;
+        if (sameName.some((q) => q.distanceTo(point) < spacing * 0.7)) continue;
+        const rad = (angle * Math.PI) / 180;
+        const box = roadLabelBoxAt(point, {
+          width:
+            textSize.width * Math.abs(Math.cos(rad)) +
+            textSize.height * Math.abs(Math.sin(rad)),
+          height:
+            textSize.width * Math.abs(Math.sin(rad)) +
+            textSize.height * Math.abs(Math.cos(rad)),
+        });
+        if (obstacleBoxes.some((o) => boxIntersects(box, o))) continue;
+        if (usedLabelBoxes.some((o) => boxIntersects(box, o))) continue;
+        sameName.push(point);
+        usedLabelBoxes.push(box);
+        layers.roadNames.addLayer(
+          createRoadNameLabel(map.containerPointToLatLng(point), name, angle),
         );
-        if (tooClose) continue;
-        const placed = findRoadLabelPlacement(
-          point,
-          name,
-          obstacleBoxes,
-          usedLabelBoxes,
-        );
-        if (!placed) continue;
-        kept.push(point);
-        usedLabelBoxes.push(placed.box);
-        layers.roadNames.addLayer(createRoadNameLabel(placed.latlng, name));
       }
     }
   }
 
   function mergePixelsForZoom(zoom) {
-    if (zoom <= 16) return 170;
-    if (zoom === 17) return 130;
-    if (zoom === 18) return 95;
-    return 64;
+    if (zoom <= 18) return 1400;
+    if (zoom === 19) return 520;
+    if (zoom === 20) return 340;
+    return 260;
   }
 
   function pixelsToMeters(px) {
@@ -3182,6 +3204,7 @@ export function createMapController() {
         const el = layer.getElement && layer.getElement();
         if (el) el.classList.remove("building-highlight");
       }
+      for (const overlay of highlighted.overlays || []) overlay.remove();
       highlighted = null;
     }
   }
@@ -3266,8 +3289,13 @@ export function createMapController() {
     updateRerouteButtonState();
 
     let bounds = null;
+    const overlays = [];
     for (const layer of entry.layers) {
-      layer.setStyle({
+      // Draw on a separate overlay so the canvas draw order is never altered.
+      const overlay = L.polygon(layer.getLatLngs(), {
+        renderer: buildingRenderer,
+        interactive: false,
+        smoothFactor: 0,
         color: "#ff5a36",
         weight: 3,
         opacity: 1,
@@ -3275,13 +3303,13 @@ export function createMapController() {
         fill: true,
         fillColor: "#ff5a36",
         fillOpacity: 0.12,
-      });
-      layer.bringToFront();
+      }).addTo(map);
+      overlays.push(overlay);
       const layerBounds = layer.getBounds ? layer.getBounds() : null;
       if (layerBounds)
         bounds = bounds ? bounds.extend(layerBounds) : layerBounds;
     }
-    highlighted = { layers: entry.layers, props: entry.props };
+    highlighted = { layers: [], props: entry.props, overlays };
 
     if (bounds) {
       map.fitBounds(bounds, { maxZoom: 19, padding: [40, 40] });

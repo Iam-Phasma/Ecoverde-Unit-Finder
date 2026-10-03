@@ -30,12 +30,12 @@ if ("serviceWorker" in navigator) {
 const controller = createMapController();
 controller.loadData("data/ecoverde.geojson");
 
-const LAYER_PREFS_STORAGE_KEY = "ecoverde:layer-visibility";
+const LAYER_PREFS_STORAGE_KEY = "ecoverde:layer-visibility:v2";
 const DEFAULT_LAYER_PREFS_DESKTOP = {
   obstacle: false,
   administrative: false,
   amenities: false,
-  roadNames: false,
+  roadNames: true,
   decoration: true,
 };
 
@@ -43,7 +43,7 @@ const DEFAULT_LAYER_PREFS_PHONE = {
   obstacle: false,
   administrative: false,
   amenities: false,
-  roadNames: false,
+  roadNames: true,
   decoration: false,
 };
 
@@ -91,7 +91,7 @@ function readLayerPrefs() {
       obstacle: Boolean(parsed?.obstacle),
       administrative: parsed?.administrative ?? fallback.administrative,
       amenities: parsed?.amenities ?? fallback.amenities,
-      roadNames: Boolean(parsed?.roadNames),
+      roadNames: parsed?.roadNames ?? fallback.roadNames,
       decoration: parsed?.decoration ?? fallback.decoration,
     };
   } catch {
@@ -227,3 +227,63 @@ searchForm.addEventListener("submit", (e) => {
     console.warn(`No unit matching Block ${block}, Lot ${lot}.`);
   }
 });
+
+// Desktop-only welcome overlay: blurred map with a block/lot search, or skip to explore.
+function setupWelcomeOverlay() {
+  const overlay = document.getElementById("welcome");
+  if (!overlay || isPhoneDevice) return;
+
+  const form = document.getElementById("welcome-form");
+  const blockEl = document.getElementById("welcome-block");
+  const lotEl = document.getElementById("welcome-lot");
+  const findEl = document.getElementById("welcome-find");
+  const skipEl = document.getElementById("welcome-skip");
+
+  function syncOptions() {
+    const current = blockEl.value;
+    blockEl.innerHTML = controller.blockSelect.innerHTML;
+    blockEl.value = current;
+    lotEl.innerHTML = controller.lotSelect.innerHTML;
+    lotEl.disabled = controller.lotSelect.disabled;
+    findEl.disabled = !blockEl.value;
+  }
+
+  function close() {
+    document.removeEventListener("keydown", onKeydown);
+    overlay.classList.add("welcome--leaving");
+    setTimeout(() => overlay.classList.add("hidden"), 300);
+  }
+
+  function onKeydown(e) {
+    if (e.key === "Escape") close();
+  }
+
+  new MutationObserver(syncOptions).observe(controller.blockSelect, {
+    childList: true,
+  });
+
+  blockEl.addEventListener("change", () => {
+    controller.blockSelect.value = blockEl.value;
+    controller.blockSelect.dispatchEvent(new Event("change"));
+    lotEl.innerHTML = controller.lotSelect.innerHTML;
+    lotEl.disabled = controller.lotSelect.disabled;
+    findEl.disabled = !blockEl.value;
+  });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!blockEl.value) return;
+    controller.lotSelect.value = lotEl.value;
+    controller.lotSelect.dispatchEvent(new Event("change"));
+    close();
+    searchForm.requestSubmit();
+  });
+
+  skipEl.addEventListener("click", close);
+  document.addEventListener("keydown", onKeydown);
+
+  syncOptions();
+  overlay.classList.remove("hidden");
+}
+
+setupWelcomeOverlay();

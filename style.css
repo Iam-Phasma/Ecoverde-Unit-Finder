@@ -433,18 +433,19 @@ main {
 }
 
 .road-name-text {
-  display: inline-block;
-  padding: 0.14rem 0.42rem;
-  border-radius: 6px;
-  border: 1px solid #2b59c3;
-  background: #3a6fe0;
-  color: #ffffff;
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  line-height: 1.1;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 50% 50%;
+  color: #2d2f33;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
   white-space: nowrap;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  text-shadow:
+    -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff,
+    0 0 3px #fff;
 }
 
 .route-casing {
@@ -969,4 +970,99 @@ main {
   to {
     fill-opacity: 0.9;
   }
+}
+
+.welcome {
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(244, 239, 228, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: opacity 0.3s ease;
+}
+
+.welcome.hidden {
+  display: none;
+}
+
+.welcome.welcome--leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.welcome-card {
+  width: min(440px, 90vw);
+  padding: 1.75rem 1.75rem 1.25rem;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  color: var(--ink);
+}
+
+.welcome-card h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
+}
+
+.welcome-card p {
+  margin: 0 0 1.1rem;
+  font-size: 0.95rem;
+  opacity: 0.75;
+}
+
+.welcome-fields {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.welcome-fields select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.5rem;
+  border: 1px solid var(--building-line);
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--ink);
+}
+
+.welcome-fields select:disabled {
+  color: #a39a8d;
+  background: #f6f1e8;
+}
+
+.welcome-fields button {
+  padding: 0.55rem 1.1rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.welcome-fields button:disabled {
+  background: #7ea48f;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.welcome-skip {
+  margin-top: 1rem;
+  padding: 0.35rem 0.6rem;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-decoration: underline;
 }
