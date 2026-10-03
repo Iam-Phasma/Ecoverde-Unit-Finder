@@ -6,6 +6,12 @@ const path = require("path");
 const RAW_PATH = path.join(__dirname, "..", "data", "ecoverde-raw.json");
 const BARRIERS_PATH = path.join(__dirname, "..", "data", "barriers-raw.json");
 const CONTEXT_PATH = path.join(__dirname, "..", "data", "context-raw.json");
+const CITYBLOCK_OVERRIDES_PATH = path.join(
+  __dirname,
+  "..",
+  "data",
+  "cityblock-overrides.geojson",
+);
 const OUT_PATH = path.join(__dirname, "..", "data", "ecoverde.geojson");
 
 const raw = JSON.parse(fs.readFileSync(RAW_PATH, "utf8"));
@@ -176,6 +182,48 @@ for (const el of contextRaw.elements) {
     properties: { category, ...el.tags },
     geometry: { type: "LineString", coordinates: coords },
   });
+}
+
+// Local city_block polygons for pads that vanished from OSM (or never landed in
+// Overpass). Prefer live OSM geometry when present; otherwise keep the pad so
+// the green map background does not show through under those blocks.
+if (fs.existsSync(CITYBLOCK_OVERRIDES_PATH)) {
+  const overrides = JSON.parse(
+    fs.readFileSync(CITYBLOCK_OVERRIDES_PATH, "utf8"),
+  );
+  const existingCityBlocks = new Set(
+    features
+      .filter((f) => f.properties.category === "cityblock" && f.properties.block)
+      .map((f) => String(f.properties.block)),
+  );
+  let applied = 0;
+  for (const feature of overrides.features || []) {
+    const props = feature?.properties || {};
+    const block =
+      props.block != null
+        ? String(props.block)
+        : parseCityBlockKey(props.name);
+    if (!block || existingCityBlocks.has(block)) continue;
+    if (!feature.geometry) continue;
+    features.push({
+      type: "Feature",
+      properties: {
+        category: "cityblock",
+        place: "city_block",
+        name: props.name || `Block ${block}`,
+        block,
+        source: props.source || "local-override",
+      },
+      geometry: feature.geometry,
+    });
+    existingCityBlocks.add(block);
+    applied += 1;
+  }
+  if (applied) {
+    console.log(
+      `Applied ${applied} local cityblock override(s) for missing OSM pads`,
+    );
+  }
 }
 
 const collection = { type: "FeatureCollection", features };
