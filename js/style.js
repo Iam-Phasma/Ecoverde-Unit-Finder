@@ -441,9 +441,7 @@ export function pointToLayer(feature, latlng) {
       "tree-icon--rot-30",
     ];
     const sizeMeters = sizeMetersSet[seed % sizeMetersSet.length];
-    const size = Math.round(
-      metersToPixels(sizeMeters, { zoom: 19, lat: point.lat }, 8),
-    );
+    const size = metersToPixels(sizeMeters, { zoom: 19, lat: point.lat }, 0);
     const flipped = ((seed >> 2) & 1) === 1;
     const assetClass = "tree-icon--asset2";
     const rotationClass = rotations[Math.floor(Math.random() * rotations.length)];
@@ -466,7 +464,7 @@ export function pointToLayer(feature, latlng) {
         className: "tree-icon",
         html: `<span class="tree-icon__glyph ${assetClass} ${rotationClass}${flipped ? " tree-icon--flip" : ""}"></span>`,
         iconSize: [size, size],
-        iconAnchor: [Math.round(size / 2), Math.round(size * 0.9)],
+        iconAnchor: [(size / 2), (size * 0.9)],
       }),
       interactive: false,
       keyboard: false,

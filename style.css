@@ -215,6 +215,10 @@ main {
   vector-effect: non-scaling-stroke;
 }
 
+.leaflet-overlay-pane svg path.building-footprint {
+  shape-rendering: geometricPrecision;
+}
+
 .leaflet-overlay-pane svg path.road-fill-fixed {
   stroke-width: 6px !important;
 }
