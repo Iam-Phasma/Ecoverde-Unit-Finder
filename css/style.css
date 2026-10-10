@@ -799,16 +799,27 @@ main {
   font-weight: 700;
 }
 
+.route-eta-rows:not([hidden]) {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 0.5rem;
+  row-gap: 0.5rem;
+}
+
 .route-eta-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.95rem;
-  padding: 0.26rem 0;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.65rem;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.045);
+  border-radius: 8px;
 }
 
 .route-eta-row strong {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   color: var(--ink);
 }
 
