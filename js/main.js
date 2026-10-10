@@ -71,7 +71,9 @@ const layerAdministrative = document.getElementById("layer-administrative");
 const layerAmenities = document.getElementById("layer-amenities");
 const layerRoadNames = document.getElementById("layer-road-names");
 const layerDecoration = document.getElementById("layer-decoration");
-const layerDecorationOption = document.getElementById("layer-decoration-option");
+const layerDecorationOption = document.getElementById(
+  "layer-decoration-option",
+);
 const routeClearButton = document.getElementById("route-clear");
 const isPhoneDevice = detectPhoneDevice();
 const FIND_ICON_SEARCH_SVG =
@@ -90,9 +92,8 @@ function detectPhoneDevice() {
   if (typeof uaMobile === "boolean") return uaMobile;
 
   const ua = navigator.userAgent || "";
-  const isTablet = /iPad|Tablet|Kindle|Silk|PlayBook|Nexus 7|Nexus 9|Nexus 10/i.test(
-    ua,
-  );
+  const isTablet =
+    /iPad|Tablet|Kindle|Silk|PlayBook|Nexus 7|Nexus 9|Nexus 10/i.test(ua);
   if (isTablet) return false;
 
   return /iPhone|iPod|Windows Phone|IEMobile|Opera Mini|Android.*Mobile|Mobile/i.test(
@@ -140,7 +141,9 @@ const VIEW_LABEL = isPhoneDevice ? "View" : "Info";
 function setFindLabel(text) {
   if (findLabel) findLabel.textContent = text;
   findButton.title =
-    text === VIEW_LABEL ? "View selected block or lot" : "Find selected block or lot";
+    text === VIEW_LABEL
+      ? "View selected block or lot"
+      : "Find selected block or lot";
 }
 
 function setFindIconHtml(svgMarkup) {
@@ -220,7 +223,8 @@ function setupLyketOverrides() {
   const thanksClassName = "lyket-thanks-visible";
   let popTimer = null;
   let thanksTimer = null;
-  const isLiked = () => root.querySelector("button")?.classList.contains("css-fpg8om");
+  const isLiked = () =>
+    root.querySelector("button")?.classList.contains("css-fpg8om");
   let wasLiked = Boolean(isLiked());
   let buttonClassObserver = null;
 
@@ -308,7 +312,10 @@ layersToggle.addEventListener("click", (e) => {
 });
 
 document.addEventListener("click", (e) => {
-  if (!layersPanel.classList.contains("hidden") && !layersPanel.contains(e.target)) {
+  if (
+    !layersPanel.classList.contains("hidden") &&
+    !layersPanel.contains(e.target)
+  ) {
     layersPanel.classList.add("hidden");
     layersToggle.setAttribute("aria-expanded", "false");
   }
@@ -415,7 +422,9 @@ searchForm.addEventListener("submit", (e) => {
     return;
   }
 
-  const entry = controller.buildingLayerById.get(`${block}|${lot}`.toLowerCase());
+  const entry = controller.buildingLayerById.get(
+    `${block}|${lot}`.toLowerCase(),
+  );
 
   if (entry) {
     controller.highlightBuilding(entry);
@@ -450,11 +459,117 @@ function setupWelcomeOverlay() {
     copyOptions(controller.lotSelect, lotEl, "Select Lot");
     lotEl.disabled = controller.lotSelect.disabled;
     findEl.disabled = !blockEl.value;
+    if (controller.blockSelect.options.length > 1) startDrift();
   }
 
   const WELCOME_FADE_MS = 300;
 
+  // Slow "trailer" drift of the map behind the overlay (fine-pointer, motion-ok devices only).
+  const driftEnabled =
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches &&
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const DRIFT_SPEED_PX_S = 20;
+  const DRIFT_RAMP_S = 2.5;
+  let driftActive = false;
+  let driftRaf = null;
+  let driftStartTimer = null;
+
+  // Closed Catmull-Rom loop through the map's extents, so turns are rounded
+  // and the view crosses the whole map before changing direction.
+  function buildDriftPath() {
+    const map = controller.map;
+    const maxBounds = map.options.maxBounds;
+    if (!maxBounds) return null;
+    const data = L.latLngBounds(maxBounds).pad(-0.25);
+    const zoom = map.getZoom();
+    const c = data.getCenter();
+    const f = 0.42;
+    const lat = (s) => c.lat + s * f * (data.getNorth() - data.getSouth());
+    const lng = (s) => c.lng + s * f * (data.getEast() - data.getWest());
+    const corners = [
+      [-1, 1],
+      [1, 1],
+      [1, -1],
+      [-1, -1],
+    ].map(([sx, sy]) => map.project([lat(sy), lng(sx)], zoom));
+    const pts = [map.project(map.getCenter(), zoom)];
+    for (let i = 0; i < 4; i++) {
+      const p = corners[i];
+      const q = corners[(i + 1) % 4];
+      pts.push(p, p.add(q).divideBy(2));
+    }
+    return { pts, zoom };
+  }
+
+  function catmull(p0, p1, p2, p3, u) {
+    const u2 = u * u;
+    const u3 = u2 * u;
+    const f = (a, b, c, d) =>
+      0.5 *
+      (2 * b +
+        (-a + c) * u +
+        (2 * a - 5 * b + 4 * c - d) * u2 +
+        (-a + 3 * b - 3 * c + d) * u3);
+    return L.point(f(p0.x, p1.x, p2.x, p3.x), f(p0.y, p1.y, p2.y, p3.y));
+  }
+
+  function runDrift() {
+    const path = buildDriftPath();
+    if (!path) return;
+    const { pts, zoom } = path;
+    const n = pts.length;
+    const segLen = pts.map((p, i) => p.distanceTo(pts[(i + 1) % n]));
+    const total = segLen.reduce((s, v) => s + v, 0);
+    let dist = 0;
+    let last = performance.now();
+    const t0 = last;
+
+    function frame(now) {
+      if (!driftActive) return;
+      const dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      const ramp = Math.min((now - t0) / 1000 / DRIFT_RAMP_S, 1);
+      dist =
+        (dist + DRIFT_SPEED_PX_S * ramp * ramp * (3 - 2 * ramp) * dt) % total;
+
+      let i = 0;
+      let rem = dist;
+      while (rem > segLen[i]) rem -= segLen[i++];
+      const u = segLen[i] ? rem / segLen[i] : 0;
+      const p = catmull(
+        pts[(i - 1 + n) % n],
+        pts[i],
+        pts[(i + 1) % n],
+        pts[(i + 2) % n],
+        u,
+      );
+      controller.map.setView(controller.map.unproject(p, zoom), zoom, {
+        animate: false,
+      });
+      driftRaf = requestAnimationFrame(frame);
+    }
+    driftRaf = requestAnimationFrame(frame);
+  }
+
+  function startDrift() {
+    if (!driftEnabled || driftActive || driftStartTimer) return;
+    // wait for data to load and the initial view to settle
+    driftStartTimer = setTimeout(() => {
+      driftStartTimer = null;
+      driftActive = true;
+      runDrift();
+    }, 800);
+  }
+
+  function stopDrift() {
+    clearTimeout(driftStartTimer);
+    driftStartTimer = null;
+    if (!driftActive) return;
+    driftActive = false;
+    cancelAnimationFrame(driftRaf);
+  }
   function close() {
+    stopDrift();
     document.removeEventListener("keydown", onKeydown);
     document.body.classList.remove("welcome-open");
     overlay.classList.add("welcome--leaving");
