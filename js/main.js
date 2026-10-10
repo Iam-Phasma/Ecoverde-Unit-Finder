@@ -1,5 +1,5 @@
 // Bootstraps the map and wires up the search form + layers menu UI.
-import { createMapController } from "./map-controller.js";
+import { createMapController } from "./map-controller.js?v=20261010-route-pause-3";
 
 const GITHUB_PAGES_HOST_PATTERN = /\.github\.io$/i;
 const GITHUB_PAGES_REPO_PATH = "/Ecoverde-Unit-Finder";

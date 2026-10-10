@@ -1419,6 +1419,11 @@ body.welcome-open .lyket-button {
   animation-delay: var(--pulse-delay, 0s);
 }
 
+.route-animation-paused .route-flow,
+.route-animation-paused .route-flow-pulse {
+  animation-play-state: paused;
+}
+
 @media (pointer: coarse), (hover: none) {
   .route-flow {
     animation: none;

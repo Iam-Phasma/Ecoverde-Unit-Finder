@@ -227,6 +227,7 @@ export function createMapController() {
   let gateMarker = null; // draggable marker letting the user relocate the route's starting point
   let gateMoved = false; // true once the user drags the gate marker away from its default position
   let routeAnimId = null;
+  let routeAnimPauseLocks = 0;
   let activeDest = null; // { destCenter, bounds } for the currently highlighted building
   let lastEtaInfo = null; // { latlng, distanceMeters, pathLatLngs } for reopening route details
   let avoidMode = false;
@@ -248,6 +249,22 @@ export function createMapController() {
     map.getContainer().classList.toggle("welcome-drift-active", active);
     lastWelcomeLabelRefresh = -Infinity;
     if (!active) refreshRoadNameLabels();
+  }
+
+  function syncRouteAnimationPauseClass() {
+    map
+      .getContainer()
+      .classList.toggle("route-animation-paused", routeAnimPauseLocks > 0);
+  }
+
+  function pauseRouteAnimation() {
+    routeAnimPauseLocks++;
+    syncRouteAnimationPauseClass();
+  }
+
+  function resumeRouteAnimation() {
+    routeAnimPauseLocks = Math.max(0, routeAnimPauseLocks - 1);
+    syncRouteAnimationPauseClass();
   }
 
   function shouldHideVehicleEtaRows() {
@@ -315,6 +332,8 @@ export function createMapController() {
     refreshRoadNameLabels();
     bringGroupToFront(layers.roadNames);
   });
+  map.on("dragstart", pauseRouteAnimation);
+  map.on("dragend", resumeRouteAnimation);
   map.on("zoomanim", (event) => {
     applyTreeZoomAnimationScale(2 ** (event.zoom - map.getZoom()));
   });
@@ -2437,8 +2456,11 @@ export function createMapController() {
       autoPan: true,
       title: "Drag to move the starting point",
     });
-
-    gateMarker.on("dragend", () => relocateGate(gateMarker.getLatLng()));
+    gateMarker.on("dragstart", pauseRouteAnimation);
+    gateMarker.on("dragend", () => {
+      relocateGate(gateMarker.getLatLng());
+      resumeRouteAnimation();
+    });
   }
 
   /** Re-snaps the gate to the nearest drivable road point and redraws the active route from there. */
@@ -2642,10 +2664,22 @@ export function createMapController() {
       Math.max(1200, (total / VISUAL_SPEED_MPS) * 1000),
     );
     const start = performance.now();
+    let pausedAt = null;
+    let pausedTotalMs = 0;
     renderRoutePanel(destLatLng, total, pathLatLngs, pathNodeKeys, options);
 
     function step(now) {
-      const t = Math.min((now - start) / duration, 1);
+      if (routeAnimPauseLocks > 0) {
+        if (pausedAt === null) pausedAt = now;
+        routeAnimId = requestAnimationFrame(step);
+        return;
+      }
+      if (pausedAt !== null) {
+        pausedTotalMs += now - pausedAt;
+        pausedAt = null;
+      }
+
+      const t = Math.min((now - start - pausedTotalMs) / duration, 1);
       const targetDist = t * total;
       let idx = 0;
       while (idx < cumulative.length - 2 && cumulative[idx + 1] < targetDist)
