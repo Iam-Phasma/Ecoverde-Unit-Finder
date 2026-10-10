@@ -471,10 +471,13 @@ function setupWelcomeOverlay() {
   const DRIFT_SPEED_PX_S = 20;
   const DRIFT_RAMP_S = 2.5;
   const DRIFT_FRAME_MS = 1000 / 30;
+  const DRIFT_RUN_MS = 60 * 1000;
+  const DRIFT_PAUSE_MS = 2 * 60 * 1000;
   let welcomeClosed = false;
   let driftActive = false;
   let driftRaf = null;
   let driftStartTimer = null;
+  let driftStopTimer = null;
 
   // Closed Catmull-Rom loop through the map's extents, so turns are rounded
   // and the view crosses the whole map before changing direction.
@@ -558,20 +561,27 @@ function setupWelcomeOverlay() {
     driftRaf = requestAnimationFrame(frame);
   }
 
-  function startDrift() {
+  function startDrift(delay = 800) {
     if (!driftEnabled || welcomeClosed || document.hidden || driftActive || driftStartTimer) return;
     // wait for data to load and the initial view to settle
     driftStartTimer = setTimeout(() => {
       driftStartTimer = null;
+      if (welcomeClosed || document.hidden) return;
       driftActive = true;
       controller.setWelcomeDriftActive(true);
       runDrift();
-    }, 800);
+      driftStopTimer = setTimeout(() => {
+        stopDrift();
+        startDrift(DRIFT_PAUSE_MS);
+      }, DRIFT_RUN_MS);
+    }, delay);
   }
 
   function stopDrift() {
     clearTimeout(driftStartTimer);
     driftStartTimer = null;
+    clearTimeout(driftStopTimer);
+    driftStopTimer = null;
     if (!driftActive) return;
     driftActive = false;
     cancelAnimationFrame(driftRaf);
