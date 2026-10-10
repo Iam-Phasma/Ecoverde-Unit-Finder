@@ -3382,5 +3382,10 @@ export function createMapController() {
     highlightCityBlock,
     clearSelection,
     setLayerVisibility,
+    isRoutePanelOpen: () =>
+      Boolean(routePanel) &&
+      !routePanel.classList.contains("hidden") &&
+      !routePanel.classList.contains("is-hiding"),
+    hideRoutePanel,
   };
 }

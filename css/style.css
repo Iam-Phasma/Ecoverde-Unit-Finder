@@ -1412,3 +1412,22 @@ body.welcome-open .lyket-button {
     filter: none;
   }
 }
+
+/* Touch devices: taller, evenly sized route panel buttons. */
+@media (pointer: coarse), (hover: none) {
+  .route-actions {
+    align-items: stretch;
+  }
+
+  .route-actions button {
+    height: 2.45rem;
+    min-height: 2.45rem;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-radius: 10px;
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

@@ -135,10 +135,12 @@ function writeLayerPrefs() {
 
 const findLabel = findButton.querySelector(".find-toggle-label");
 
+const VIEW_LABEL = isPhoneDevice ? "View" : "Info";
+
 function setFindLabel(text) {
   if (findLabel) findLabel.textContent = text;
   findButton.title =
-    text === "View" ? "View selected block or lot" : "Find selected block or lot";
+    text === VIEW_LABEL ? "View selected block or lot" : "Find selected block or lot";
 }
 
 function setFindIconHtml(svgMarkup) {
@@ -388,6 +390,10 @@ updateFindButtonState();
 
 searchForm.addEventListener("submit", (e) => {
   e.preventDefault();
+  if (findLabel?.textContent === VIEW_LABEL && controller.isRoutePanelOpen()) {
+    controller.hideRoutePanel();
+    return;
+  }
   const block = controller.blockSelect.value;
   const lot = controller.lotSelect.value;
   if (!block) {
@@ -401,7 +407,7 @@ searchForm.addEventListener("submit", (e) => {
     const blockEntry = controller.cityBlockLayersByKey.get(block);
     if (blockEntry) {
       controller.highlightCityBlock(blockEntry);
-      setFindLabel("View");
+      setFindLabel(VIEW_LABEL);
       setFindIconForSuccessfulSearch();
     } else {
       console.warn(`No block boundary matching Block ${block}.`);
@@ -413,7 +419,7 @@ searchForm.addEventListener("submit", (e) => {
 
   if (entry) {
     controller.highlightBuilding(entry);
-    setFindLabel("View");
+    setFindLabel(VIEW_LABEL);
     setFindIconForSuccessfulSearch();
   } else {
     console.warn(`No unit matching Block ${block}, Lot ${lot}.`);
