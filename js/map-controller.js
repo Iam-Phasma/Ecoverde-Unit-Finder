@@ -238,6 +238,14 @@ export function createMapController() {
   let routeDebugEnabled = readRouteDebugEnabled();
   let activeRoutePathLatLngs = null;
   let administrativeSourceMarkers = [];
+  let welcomeDriftActive = false;
+  let lastWelcomeLabelRefresh = -Infinity;
+
+  function setWelcomeDriftActive(active) {
+    welcomeDriftActive = active;
+    lastWelcomeLabelRefresh = -Infinity;
+    if (!active) refreshRoadNameLabels();
+  }
 
   function shouldHideVehicleEtaRows() {
     return panelMode === "block" || isPhoneViewport.matches;
@@ -296,6 +304,11 @@ export function createMapController() {
     bringGroupToFront(layers.roadNames);
   });
   map.on("moveend", () => {
+    if (welcomeDriftActive) {
+      const now = performance.now();
+      if (now - lastWelcomeLabelRefresh < 500) return;
+      lastWelcomeLabelRefresh = now;
+    }
     refreshRoadNameLabels();
     bringGroupToFront(layers.roadNames);
   });
@@ -3382,6 +3395,7 @@ export function createMapController() {
     highlightCityBlock,
     clearSelection,
     setLayerVisibility,
+    setWelcomeDriftActive,
     isRoutePanelOpen: () =>
       Boolean(routePanel) &&
       !routePanel.classList.contains("hidden") &&

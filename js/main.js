@@ -470,6 +470,8 @@ function setupWelcomeOverlay() {
     !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const DRIFT_SPEED_PX_S = 20;
   const DRIFT_RAMP_S = 2.5;
+  const DRIFT_FRAME_MS = 1000 / 30;
+  let welcomeClosed = false;
   let driftActive = false;
   let driftRaf = null;
   let driftStartTimer = null;
@@ -520,12 +522,18 @@ function setupWelcomeOverlay() {
     const n = pts.length;
     const segLen = pts.map((p, i) => p.distanceTo(pts[(i + 1) % n]));
     const total = segLen.reduce((s, v) => s + v, 0);
+    if (!Number.isFinite(total) || total <= 0) return;
     let dist = 0;
     let last = performance.now();
     const t0 = last;
+    let lastRender = -Infinity;
 
     function frame(now) {
       if (!driftActive) return;
+      driftRaf = requestAnimationFrame(frame);
+      // Keep the slow pan independent of the display's refresh rate.
+      if (now - lastRender < DRIFT_FRAME_MS - 0.5) return;
+      lastRender = now;
       const dt = Math.min((now - last) / 1000, 0.1);
       last = now;
       const ramp = Math.min((now - t0) / 1000 / DRIFT_RAMP_S, 1);
@@ -546,17 +554,17 @@ function setupWelcomeOverlay() {
       controller.map.setView(controller.map.unproject(p, zoom), zoom, {
         animate: false,
       });
-      driftRaf = requestAnimationFrame(frame);
     }
     driftRaf = requestAnimationFrame(frame);
   }
 
   function startDrift() {
-    if (!driftEnabled || driftActive || driftStartTimer) return;
+    if (!driftEnabled || welcomeClosed || document.hidden || driftActive || driftStartTimer) return;
     // wait for data to load and the initial view to settle
     driftStartTimer = setTimeout(() => {
       driftStartTimer = null;
       driftActive = true;
+      controller.setWelcomeDriftActive(true);
       runDrift();
     }, 800);
   }
@@ -567,9 +575,19 @@ function setupWelcomeOverlay() {
     if (!driftActive) return;
     driftActive = false;
     cancelAnimationFrame(driftRaf);
+    driftRaf = null;
+    controller.setWelcomeDriftActive(false);
+  }
+  function onVisibilityChange() {
+    if (document.hidden) stopDrift();
+    else startDrift();
   }
   function close() {
+    if (welcomeClosed) return;
+    welcomeClosed = true;
     stopDrift();
+    optionsObserver.disconnect();
+    document.removeEventListener("visibilitychange", onVisibilityChange);
     document.removeEventListener("keydown", onKeydown);
     document.body.classList.remove("welcome-open");
     overlay.classList.add("welcome--leaving");
@@ -580,7 +598,8 @@ function setupWelcomeOverlay() {
     if (e.key === "Escape") close();
   }
 
-  new MutationObserver(syncOptions).observe(controller.blockSelect, {
+  const optionsObserver = new MutationObserver(syncOptions);
+  optionsObserver.observe(controller.blockSelect, {
     childList: true,
   });
 
@@ -604,6 +623,7 @@ function setupWelcomeOverlay() {
 
   skipEl.addEventListener("click", close);
   document.addEventListener("keydown", onKeydown);
+  document.addEventListener("visibilitychange", onVisibilityChange);
 
   syncOptions();
   document.body.classList.add("welcome-open");
