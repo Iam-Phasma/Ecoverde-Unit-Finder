@@ -1071,38 +1071,15 @@ export function createMapController() {
     return layer?._icon?.querySelector?.(".tree-icon__glyph") || null;
   }
 
-  // Scale the inner glyph, not the marker element: the individual `scale`
-  // property composes outside Leaflet's translate3d and would scale the position.
+  // Driven by one CSS variable (see .leaflet-zoom-anim in style.css) instead of
+  // touching every tree element on each zoom, which caused lag on large datasets.
   function applyTreeZoomAnimationScale(scale) {
-    const scaleLayer = (layerGroup) => {
-      layerGroup.eachLayer((layer) => {
-        const glyph = layer?._treeVariant && treeGlyphOf(layer);
-        if (!glyph) return;
-        glyph.style.transformOrigin = "50% 90%";
-        glyph.style.transition = "scale 0.25s cubic-bezier(0, 0, 0.25, 1)";
-        glyph.style.scale = String(scale);
-      });
-    };
-
-    scaleLayer(layers.pois);
-    scaleLayer(layers.forestTrees);
+    map.getContainer().style.setProperty("--tree-zoom-scale", String(scale));
   }
 
   function clearTreeZoomAnimationScale() {
-    const clearLayer = (layerGroup) => {
-      layerGroup.eachLayer((layer) => {
-        const glyph = layer?._treeVariant && treeGlyphOf(layer);
-        if (!glyph) return;
-        glyph.style.transition = "none";
-        glyph.style.removeProperty("scale");
-        glyph.style.removeProperty("transform-origin");
-      });
-    };
-
-    clearLayer(layers.pois);
-    clearLayer(layers.forestTrees);
+    map.getContainer().style.removeProperty("--tree-zoom-scale");
   }
-
   function applyTreeSizeScale() {
     const scaleLayer = (layerGroup) => {
       layerGroup.eachLayer((layer) => {

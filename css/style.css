@@ -1364,3 +1364,41 @@ body.welcome-open .lyket-button {
   opacity: 0;
   pointer-events: none;
 }
+
+/* Zoom animation: scale tree glyphs via one variable and skip the costly drop-shadow filter. */
+.leaflet-zoom-anim .tree-icon__glyph {
+  scale: var(--tree-zoom-scale, 1);
+  transform-origin: 50% 90%;
+  filter: none;
+  transition: scale 0.25s cubic-bezier(0, 0, 0.25, 1);
+  will-change: scale;
+}
+
+
+/* Phones/tablets: dashes stay static; chunks fade in/out in sequence toward the destination
+   (stepped for a low repaint rate), and SVG filters are dropped. */
+@keyframes route-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.route-flow-pulse {
+  animation: route-pulse 1.4s steps(5, end) infinite;
+  animation-delay: var(--pulse-delay, 0s);
+}
+
+@media (pointer: coarse), (hover: none) {
+  .route-flow {
+    animation: none;
+  }
+
+  .route-casing,
+  .route-marker {
+    filter: none;
+  }
+}
