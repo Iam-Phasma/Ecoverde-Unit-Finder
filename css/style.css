@@ -306,6 +306,10 @@ body {
   cursor: pointer;
 }
 
+.layers-panel label[hidden] {
+  display: none;
+}
+
 main {
   position: relative;
   height: 100%;
@@ -598,10 +602,13 @@ main {
 }
 
 .route-casing {
+  stroke: #0047e8;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
 }
 
 .route-flow {
+  stroke: #fff;
+  stroke-opacity: 0.8;
   animation: route-flow-dash 0.7s linear infinite;
 }
 
@@ -1395,6 +1402,9 @@ body.welcome-open .lyket-button {
 @media (pointer: coarse), (hover: none) {
   .route-flow {
     animation: none;
+    stroke-dasharray: none;
+    stroke: #1195ff;
+    stroke-opacity: 1;
   }
 
   .route-casing,

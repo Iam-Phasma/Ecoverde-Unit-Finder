@@ -2706,9 +2706,9 @@ export function createMapController() {
     }
 
     if (routeDismissBtn) {
-      routeDismissBtn.textContent = "Collapse";
-      routeDismissBtn.setAttribute("aria-label", "Collapse");
-      routeDismissBtn.title = "Collapse panel";
+      routeDismissBtn.textContent = "Hide Card";
+      routeDismissBtn.setAttribute("aria-label", "Hide Card");
+      routeDismissBtn.title = "Hide card";
     }
   }
 
