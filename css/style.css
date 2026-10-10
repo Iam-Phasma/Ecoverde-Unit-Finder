@@ -204,8 +204,7 @@ body {
 
 #lyket-button button.css-fpg8om::before {
   background: center / contain no-repeat
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23e11d48' stroke='%23ffffff' stroke-width='1.6' stroke-linejoin='round' d='m12.75 20.66 6.184-7.098c2.677-2.884 2.559-6.506.754-8.705-.898-1.095-2.206-1.816-3.72-1.855-1.293-.034-2.652.43-3.963 1.442-1.315-1.012-2.678-1.476-3.973-1.442-1.515.04-2.825.76-3.724 1.855-1.806 2.201-1.915 5.823.772 8.706l6.183 7.097c.19.216.46.34.743.34a.985.985 0 0 0 .743-.34Z'/%3E%3C/svg%3E")
-    !important;
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23e11d48' stroke='%23ffffff' stroke-width='1.6' stroke-linejoin='round' d='m12.75 20.66 6.184-7.098c2.677-2.884 2.559-6.506.754-8.705-.898-1.095-2.206-1.816-3.72-1.855-1.293-.034-2.652.43-3.963 1.442-1.315-1.012-2.678-1.476-3.973-1.442-1.515.04-2.825.76-3.724 1.855-1.806 2.201-1.915 5.823.772 8.706l6.183 7.097c.19.216.46.34.743.34a.985.985 0 0 0 .743-.34Z'/%3E%3C/svg%3E") !important;
   -webkit-mask: none !important;
   mask: none !important;
 }
@@ -337,7 +336,9 @@ main {
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.03em;
-  box-shadow: 0 0 0 3px #2f7d4f, 0 8px 16px rgba(0, 0, 0, 0.18);
+  box-shadow:
+    0 0 0 3px #2f7d4f,
+    0 8px 16px rgba(0, 0, 0, 0.18);
   pointer-events: none;
 }
 
@@ -491,7 +492,8 @@ main {
 }
 
 .tree-icon--bg .tree-icon__glyph {
-  filter: saturate(0.86) brightness(0.9) drop-shadow(0 4px 5px rgba(35, 60, 28, 0.24));
+  filter: saturate(0.86) brightness(0.9)
+    drop-shadow(0 4px 5px rgba(35, 60, 28, 0.24));
 }
 
 /* Skip per-tree shadows during the welcome pan; keep background tree colors. */
@@ -573,7 +575,9 @@ main {
   align-items: center;
   justify-content: center;
   line-height: 1;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92), 0 3px 9px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.92),
+    0 3px 9px rgba(0, 0, 0, 0.25);
 }
 
 .obstacle-pin-badge--no-exit {
@@ -606,7 +610,10 @@ main {
   line-height: 1;
   white-space: nowrap;
   text-shadow:
-    -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff,
+    -1px -1px 0 #fff,
+    1px -1px 0 #fff,
+    -1px 1px 0 #fff,
+    1px 1px 0 #fff,
     0 0 3px #fff;
 }
 
@@ -823,7 +830,7 @@ main {
   font-size: 0.85rem;
   padding: 0.5rem 0.65rem;
   white-space: nowrap;
-  background: rgba(0, 0, 0, 0.045);
+  background: rgba(0, 0, 0, 0.035);
   border-radius: 8px;
 }
 
@@ -1130,8 +1137,6 @@ main {
     min-height: 2.45rem !important;
   }
 
-
-
   .route-actions {
     justify-content: stretch;
   }
@@ -1298,7 +1303,9 @@ main {
   font-family: inherit;
   appearance: none;
   -webkit-appearance: none;
-  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%23454d5a' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m5 9 7 7 7-7'/%3E%3C/svg%3E") no-repeat right 0.9rem center;
+  background: #fff
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%23454d5a' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m5 9 7 7 7-7'/%3E%3C/svg%3E")
+    no-repeat right 0.9rem center;
   color: var(--ink);
 }
 
@@ -1400,7 +1407,6 @@ body.welcome-open .lyket-button {
   transition: scale 0.25s cubic-bezier(0, 0, 0.25, 1);
   will-change: scale;
 }
-
 
 /* Phones/tablets: dashes stay static; chunks fade in/out in sequence toward the destination
    (stepped for a low repaint rate), and SVG filters are dropped. */
