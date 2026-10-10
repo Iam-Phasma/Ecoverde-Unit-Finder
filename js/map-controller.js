@@ -74,9 +74,11 @@ function parkingTooltipLabel(props = {}) {
 
 export function createMapController() {
   const isPhoneViewport = window.matchMedia("(max-width: 720px)");
-  const bakedRenderer = L.canvas({ padding: 1.2 });
-  const buildingRenderer = L.svg({ padding: 1.2 });
-  const routeRenderer = L.svg({ padding: 1.2 });
+  // Retain a margin for panning without drawing a large offscreen area.
+  const rendererPadding = 0.95;
+  const bakedRenderer = L.canvas({ padding: rendererPadding });
+  const buildingRenderer = L.svg({ padding: rendererPadding });
+  const routeRenderer = L.svg({ padding: rendererPadding });
   const map = L.map("map", {
     zoomControl: false,
     attributionControl: false,
@@ -243,6 +245,7 @@ export function createMapController() {
 
   function setWelcomeDriftActive(active) {
     welcomeDriftActive = active;
+    map.getContainer().classList.toggle("welcome-drift-active", active);
     lastWelcomeLabelRefresh = -Infinity;
     if (!active) refreshRoadNameLabels();
   }
@@ -983,7 +986,7 @@ export function createMapController() {
       className: `tree-icon${variant.isBackground ? " tree-icon--bg" : ""}`,
       html: `<span class="tree-icon__glyph ${glyphClasses}"></span>`,
       iconSize: [sizePx, sizePx],
-      iconAnchor: [(sizePx / 2), (sizePx * 0.9)],
+      iconAnchor: [sizePx / 2, sizePx * 0.9],
     });
   }
 
@@ -1116,10 +1119,7 @@ export function createMapController() {
 
         if (layer.options?.icon?.options) {
           layer.options.icon.options.iconSize = [sizePx, sizePx];
-          layer.options.icon.options.iconAnchor = [
-            (sizePx / 2),
-            (sizePx * 0.9),
-          ];
+          layer.options.icon.options.iconAnchor = [sizePx / 2, sizePx * 0.9];
         }
         layer._treePixelSize = sizePx;
       });
@@ -1321,7 +1321,12 @@ export function createMapController() {
     const realEstatePins = [];
     const adminOfficePins = [];
     const gazeboPins = [];
-    const amenityTypes = new Set(["basketball", "restroom", "pavilion", "gazebo"]);
+    const amenityTypes = new Set([
+      "basketball",
+      "restroom",
+      "pavilion",
+      "gazebo",
+    ]);
     for (const feature of features) {
       const pin = pinMetaForFeature(feature);
       if (!pin) continue;
@@ -1507,7 +1512,10 @@ export function createMapController() {
       const adminPoints = [];
       layers.administrative.eachLayer((layer) => {
         if (typeof layer?.getLatLng !== "function") return;
-        if (typeof layer?.getOpacity === "function" && layer.getOpacity() <= 0.01)
+        if (
+          typeof layer?.getOpacity === "function" &&
+          layer.getOpacity() <= 0.01
+        )
           return;
         adminPoints.push(map.latLngToContainerPoint(layer.getLatLng()));
       });
@@ -1516,7 +1524,8 @@ export function createMapController() {
         for (const marker of amenitiesSourceMarkers) {
           const point = map.latLngToContainerPoint(marker.getLatLng());
           const overlapsAdmin = adminPoints.some(
-            (adminPoint) => point.distanceTo(adminPoint) <= ADMIN_PIN_OVERLAP_PX,
+            (adminPoint) =>
+              point.distanceTo(adminPoint) <= ADMIN_PIN_OVERLAP_PX,
           );
           if (overlapsAdmin) setAmenitiesMarkerVisible(marker, false);
         }
@@ -1907,7 +1916,8 @@ export function createMapController() {
     if (total < textWidth + 8) return [];
 
     const offsets = [0];
-    for (let k = 1; total / 2 - k * spacing >= half; k++) offsets.push(k * spacing, -k * spacing);
+    for (let k = 1; total / 2 - k * spacing >= half; k++)
+      offsets.push(k * spacing, -k * spacing);
 
     const spots = [];
     for (const off of offsets) {
@@ -1919,9 +1929,12 @@ export function createMapController() {
       if (chord < textWidth * 0.9) continue;
       let bent = false;
       for (let i = 0; i < pts.length; i++) {
-        if (cum[i] <= d - textWidth / 2 || cum[i] >= d + textWidth / 2) continue;
+        if (cum[i] <= d - textWidth / 2 || cum[i] >= d + textWidth / 2)
+          continue;
         const dev =
-          Math.abs((b.x - a.x) * (a.y - pts[i].y) - (a.x - pts[i].x) * (b.y - a.y)) / chord;
+          Math.abs(
+            (b.x - a.x) * (a.y - pts[i].y) - (a.x - pts[i].x) * (b.y - a.y),
+          ) / chord;
         if (dev > textWidth * 0.1) {
           bent = true;
           break;
@@ -1993,9 +2006,19 @@ export function createMapController() {
   }
 
   function refreshRoadNameLabels() {
-    layers.roadNames.clearLayers();
-    if (!map.hasLayer(layers.roadNames) || roadNameCandidates.length === 0)
+    if (!map.hasLayer(layers.roadNames) || roadNameCandidates.length === 0) {
+      layers.roadNames.clearLayers();
       return;
+    }
+
+    // Reuse visible markers with the same text and rotation. Keep no spare pool:
+    // labels no longer needed are removed at the end of this refresh.
+    const reusableLabels = new Map();
+    layers.roadNames.eachLayer((marker) => {
+      const key = marker._roadLabelKey;
+      if (!reusableLabels.has(key)) reusableLabels.set(key, []);
+      reusableLabels.get(key).push(marker);
+    });
 
     const spacing = mergePixelsForZoom(map.getZoom());
     const obstacleBoxes = collectObstacleBoxesPx();
@@ -2019,7 +2042,13 @@ export function createMapController() {
       });
     }
 
-    function placeSpot(candidateIndex, name, textSize, spot, allowOverlap = false) {
+    function placeSpot(
+      candidateIndex,
+      name,
+      textSize,
+      spot,
+      allowOverlap = false,
+    ) {
       const { point, angle } = spot;
       if (!isInViewport(point)) return false;
       const box = projectLabelBox(point, angle, textSize);
@@ -2032,9 +2061,16 @@ export function createMapController() {
 
       placedSpots.add(key);
       usedLabelBoxes.push(box);
-      layers.roadNames.addLayer(
-        createRoadNameLabel(map.containerPointToLatLng(point), name, angle),
-      );
+      const labelKey = JSON.stringify([name, angle.toFixed(1)]);
+      const reusable = reusableLabels.get(labelKey)?.pop();
+      const latlng = map.containerPointToLatLng(point);
+      if (reusable) {
+        if (!reusable.getLatLng().equals(latlng)) reusable.setLatLng(latlng);
+      } else {
+        const marker = createRoadNameLabel(latlng, name, angle);
+        marker._roadLabelKey = labelKey;
+        layers.roadNames.addLayer(marker);
+      }
       return true;
     }
 
@@ -2043,8 +2079,8 @@ export function createMapController() {
       const candidate = roadNameCandidates[i];
       const name = candidate.name;
       const textSize = estimateRoadLabelSize(name);
-      const spots = roadLabelSpotsPx(candidate, textSize.width, spacing).filter((s) =>
-        isInViewport(s.point),
+      const spots = roadLabelSpotsPx(candidate, textSize.width, spacing).filter(
+        (s) => isInViewport(s.point),
       );
       if (spots.length === 0) continue;
 
@@ -2072,6 +2108,10 @@ export function createMapController() {
         if (!placeSpot(i, name, textSize, spot)) continue;
         sameName.push(point);
       }
+    }
+
+    for (const markers of reusableLabels.values()) {
+      for (const marker of markers) layers.roadNames.removeLayer(marker);
     }
   }
 
