@@ -46,6 +46,10 @@ const controller = createMapController();
 controller.loadData("data/ecoverde.geojson");
 
 const LAYER_PREFS_STORAGE_KEY = "ecoverde:layer-visibility:v2";
+const RECENT_SEARCHES_STORAGE_KEY = "ecoverde:recent-searches:v1";
+const UI_SIZE_STORAGE_KEY = "ecoverde:ui-size:v1";
+const MAX_RECENT_SEARCHES = 5;
+const deepLinkParams = new URLSearchParams(location.search);
 const DEFAULT_LAYER_PREFS_DESKTOP = {
   obstacle: false,
   administrative: false,
@@ -64,8 +68,13 @@ const DEFAULT_LAYER_PREFS_PHONE = {
 
 const searchForm = document.getElementById("search-form");
 const findButton = searchForm.querySelector('button[type="submit"]');
-const layersToggle = document.getElementById("layers-toggle");
-const layersPanel = document.getElementById("layers-panel");
+const recentToggle = document.getElementById("recent-toggle");
+const recentPanel = document.getElementById("recent-panel");
+const recentList = document.getElementById("recent-list");
+const settingsToggle = document.getElementById("settings-toggle");
+const settingsPanel = document.getElementById("settings-panel");
+const uiSizeSelect = document.getElementById("ui-size-select");
+const uiSizeSection = document.querySelector(".settings-section-ui");
 const layerObstacle = document.getElementById("layer-obstacle");
 const layerAdministrative = document.getElementById("layer-administrative");
 const layerAmenities = document.getElementById("layer-amenities");
@@ -80,6 +89,44 @@ const FIND_ICON_SEARCH_SVG =
   '<svg class="find-toggle-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="m21 21-3.5-3.5M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>';
 const FIND_ICON_SUCCESS_SVG =
   '<svg class="find-toggle-icon w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 11h2v5m-2 0h4m-2.592-8.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>';
+const deepLinkBlock = (deepLinkParams.get("block") || "").trim();
+const deepLinkLot = (deepLinkParams.get("lot") || "").trim();
+
+function parseBooleanParam(value) {
+  if (value === null) return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === "1" || normalized === "true") return true;
+  if (normalized === "0" || normalized === "false") return false;
+  return null;
+}
+
+function parseNumberParam(value) {
+  if (value === null) return null;
+  const parsed = Number.parseFloat(String(value).trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+const deepLinkLayerPrefs = {
+  obstacle: parseBooleanParam(deepLinkParams.get("obs")),
+  administrative: parseBooleanParam(deepLinkParams.get("adm")),
+  amenities: parseBooleanParam(deepLinkParams.get("amen")),
+  roadNames: parseBooleanParam(deepLinkParams.get("road")),
+  decoration: parseBooleanParam(deepLinkParams.get("deco")),
+};
+
+const deepLinkViewState = {
+  lat: parseNumberParam(deepLinkParams.get("lat")),
+  lng: parseNumberParam(deepLinkParams.get("lng")),
+  zoom: parseNumberParam(deepLinkParams.get("z")),
+};
+
+function hasDeepLinkViewState() {
+  return (
+    Number.isFinite(deepLinkViewState.lat) &&
+    Number.isFinite(deepLinkViewState.lng) &&
+    Number.isFinite(deepLinkViewState.zoom)
+  );
+}
 
 function defaultLayerPrefs() {
   return isPhoneDevice
@@ -132,6 +179,74 @@ function writeLayerPrefs() {
   } catch {
     // Ignore storage write issues (private mode/quota) and continue.
   }
+}
+
+function resolveLayerPrefWithDeepLink(key, fallbackValue) {
+  const deepLinkValue = deepLinkLayerPrefs[key];
+  return typeof deepLinkValue === "boolean" ? deepLinkValue : fallbackValue;
+}
+
+function readRecentSearches() {
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry) => {
+        const block = String(entry?.block ?? "").trim();
+        const lot = String(entry?.lot ?? "").trim();
+        if (!block) return null;
+        return { block, lot };
+      })
+      .filter(Boolean)
+      .slice(0, MAX_RECENT_SEARCHES);
+  } catch {
+    return [];
+  }
+}
+
+function writeRecentSearches(recentSearches) {
+  try {
+    localStorage.setItem(
+      RECENT_SEARCHES_STORAGE_KEY,
+      JSON.stringify(recentSearches),
+    );
+  } catch {
+    // Ignore storage write issues (private mode/quota) and continue.
+  }
+}
+
+const UI_SIZE_SEQUENCE = ["default", "x2", "x4", "x6"];
+
+function readUiSize() {
+  try {
+    const raw = String(localStorage.getItem(UI_SIZE_STORAGE_KEY) || "").trim();
+    if (raw === "compact") return "default";
+    if (raw === "large") return "x2";
+    if (raw === "tv") return "x4";
+    if (raw === "x8") return "x6";
+    return UI_SIZE_SEQUENCE.includes(raw) ? raw : "default";
+  } catch {
+    return "default";
+  }
+}
+
+function writeUiSize(size) {
+  try {
+    localStorage.setItem(UI_SIZE_STORAGE_KEY, size);
+  } catch {
+    // Ignore storage write issues (private mode/quota) and continue.
+  }
+}
+
+function applyUiSize(size) {
+  const mode = UI_SIZE_SEQUENCE.includes(size) ? size : "default";
+  document.body.classList.toggle("ui-size-2x", mode === "x2");
+  document.body.classList.toggle("ui-size-4x", mode === "x4");
+  document.body.classList.toggle("ui-size-6x", mode === "x6");
+  if (uiSizeSelect) uiSizeSelect.value = mode;
+  return mode;
 }
 
 const findLabel = findButton.querySelector(".find-toggle-label");
@@ -305,20 +420,120 @@ function resetSelectionInputs() {
   updateFindButtonState();
 }
 
-layersToggle.addEventListener("click", (e) => {
+let recentSearches = readRecentSearches();
+
+function closeRecentPanel() {
+  if (!recentPanel || !recentToggle) return;
+  recentPanel.classList.add("hidden");
+  recentToggle.setAttribute("aria-expanded", "false");
+}
+
+function closeSettingsPanel() {
+  settingsPanel.classList.add("hidden");
+  settingsToggle.setAttribute("aria-expanded", "false");
+}
+
+function formatRecentSearchLabel(entry) {
+  return entry.lot
+    ? `Block ${entry.block}, Lot ${entry.lot}`
+    : `Block ${entry.block}`;
+}
+
+function renderRecentSearches() {
+  if (!recentList || !recentToggle) return;
+  recentList.innerHTML = "";
+
+  if (!recentSearches.length) {
+    recentToggle.disabled = true;
+    const empty = document.createElement("p");
+    empty.className = "recent-item-empty";
+    empty.textContent = "No recent searches yet.";
+    recentList.appendChild(empty);
+    return;
+  }
+
+  recentToggle.disabled = false;
+
+  for (const entry of recentSearches) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "recent-item";
+    button.textContent = formatRecentSearchLabel(entry);
+    button.addEventListener("click", () => {
+      const hasBlock = [...controller.blockSelect.options].some(
+        (option) => option.value === entry.block,
+      );
+      if (!hasBlock) return;
+      controller.blockSelect.value = entry.block;
+      controller.blockSelect.dispatchEvent(new Event("change"));
+      if (entry.lot) {
+        const hasLot = [...controller.lotSelect.options].some(
+          (option) => option.value === entry.lot,
+        );
+        controller.lotSelect.value = hasLot ? entry.lot : "";
+      } else {
+        controller.lotSelect.value = "";
+      }
+      controller.lotSelect.dispatchEvent(new Event("change"));
+      closeRecentPanel();
+      searchForm.requestSubmit();
+    });
+    recentList.appendChild(button);
+  }
+}
+
+function addRecentSearch(block, lot = "") {
+  const next = {
+    block: String(block || "").trim(),
+    lot: String(lot || "").trim(),
+  };
+  if (!next.block) return;
+  recentSearches = [
+    next,
+    ...recentSearches.filter(
+      (entry) => !(entry.block === next.block && entry.lot === next.lot),
+    ),
+  ].slice(0, MAX_RECENT_SEARCHES);
+  writeRecentSearches(recentSearches);
+  renderRecentSearches();
+}
+
+settingsToggle.addEventListener("click", (e) => {
   e.stopPropagation();
-  const expanded = layersPanel.classList.toggle("hidden") === false;
-  layersToggle.setAttribute("aria-expanded", String(expanded));
+  closeRecentPanel();
+  const expanded = settingsPanel.classList.toggle("hidden") === false;
+  settingsToggle.setAttribute("aria-expanded", String(expanded));
+  if (expanded) layerAmenities.focus();
+});
+
+recentToggle?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  closeSettingsPanel();
+  const expanded = recentPanel.classList.toggle("hidden") === false;
+  recentToggle.setAttribute("aria-expanded", String(expanded));
+  if (expanded) recentList.querySelector(".recent-item")?.focus();
 });
 
 document.addEventListener("click", (e) => {
   if (
-    !layersPanel.classList.contains("hidden") &&
-    !layersPanel.contains(e.target)
+    !settingsPanel.classList.contains("hidden") &&
+    !settingsPanel.contains(e.target)
   ) {
-    layersPanel.classList.add("hidden");
-    layersToggle.setAttribute("aria-expanded", "false");
+    closeSettingsPanel();
   }
+  if (
+    recentPanel &&
+    !recentPanel.classList.contains("hidden") &&
+    !recentPanel.contains(e.target)
+  ) {
+    closeRecentPanel();
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  closeSettingsPanel();
+  closeRecentPanel();
 });
 
 layerObstacle.addEventListener("change", () => {
@@ -363,10 +578,22 @@ routeClearButton?.addEventListener("click", () => {
 });
 
 const layerPrefs = readLayerPrefs();
-layerObstacle.checked = layerPrefs.obstacle;
-layerAdministrative.checked = layerPrefs.administrative;
-layerAmenities.checked = layerPrefs.amenities;
-layerRoadNames.checked = layerPrefs.roadNames;
+layerObstacle.checked = resolveLayerPrefWithDeepLink(
+  "obstacle",
+  layerPrefs.obstacle,
+);
+layerAdministrative.checked = resolveLayerPrefWithDeepLink(
+  "administrative",
+  layerPrefs.administrative,
+);
+layerAmenities.checked = resolveLayerPrefWithDeepLink(
+  "amenities",
+  layerPrefs.amenities,
+);
+layerRoadNames.checked = resolveLayerPrefWithDeepLink(
+  "roadNames",
+  layerPrefs.roadNames,
+);
 
 if (isPhoneDevice) {
   layerDecoration.checked = false;
@@ -374,7 +601,10 @@ if (isPhoneDevice) {
   layerDecorationOption?.setAttribute("hidden", "");
   layerDecorationOption?.setAttribute("aria-hidden", "true");
 } else {
-  layerDecoration.checked = layerPrefs.decoration;
+  layerDecoration.checked = resolveLayerPrefWithDeepLink(
+    "decoration",
+    layerPrefs.decoration,
+  );
   layerDecoration.disabled = false;
   layerDecorationOption?.removeAttribute("hidden");
   layerDecorationOption?.removeAttribute("aria-hidden");
@@ -394,6 +624,24 @@ if (isPhoneDevice) writeLayerPrefs();
 setFindIconForIdleState();
 setupLyketOverrides();
 updateFindButtonState();
+renderRecentSearches();
+
+if (isPhoneDevice) {
+  uiSizeSection?.setAttribute("hidden", "");
+  uiSizeSection?.setAttribute("aria-hidden", "true");
+  applyUiSize("default");
+} else {
+  uiSizeSection?.removeAttribute("hidden");
+  uiSizeSection?.removeAttribute("aria-hidden");
+  let uiSizeMode = applyUiSize(readUiSize());
+  uiSizeSelect?.addEventListener("change", () => {
+    const nextMode = uiSizeSelect.value;
+    if (!UI_SIZE_SEQUENCE.includes(nextMode)) return;
+    if (uiSizeMode === nextMode) return;
+    uiSizeMode = applyUiSize(nextMode);
+    writeUiSize(uiSizeMode);
+  });
+}
 
 searchForm.addEventListener("submit", (e) => {
   e.preventDefault();
@@ -416,6 +664,7 @@ searchForm.addEventListener("submit", (e) => {
       controller.highlightCityBlock(blockEntry);
       setFindLabel(VIEW_LABEL);
       setFindIconForSuccessfulSearch();
+      addRecentSearch(block);
     } else {
       console.warn(`No block boundary matching Block ${block}.`);
     }
@@ -430,6 +679,7 @@ searchForm.addEventListener("submit", (e) => {
     controller.highlightBuilding(entry);
     setFindLabel(VIEW_LABEL);
     setFindIconForSuccessfulSearch();
+    addRecentSearch(block, lot);
   } else {
     console.warn(`No unit matching Block ${block}, Lot ${lot}.`);
   }
@@ -445,6 +695,7 @@ function setupWelcomeOverlay() {
   const lotEl = document.getElementById("welcome-lot");
   const findEl = document.getElementById("welcome-find");
   const skipEl = document.getElementById("welcome-skip");
+  const previousFocus = document.activeElement;
 
   function copyOptions(source, target, placeholder) {
     target.innerHTML = source.innerHTML;
@@ -599,7 +850,15 @@ function setupWelcomeOverlay() {
     document.removeEventListener("keydown", onKeydown);
     document.body.classList.remove("welcome-open");
     overlay.classList.add("welcome--leaving");
-    setTimeout(() => overlay.classList.add("hidden"), WELCOME_FADE_MS);
+    setTimeout(() => {
+      overlay.classList.add("hidden");
+      const fallback = controller.blockSelect;
+      if (previousFocus && typeof previousFocus.focus === "function") {
+        previousFocus.focus();
+      } else if (fallback && typeof fallback.focus === "function") {
+        fallback.focus();
+      }
+    }, WELCOME_FADE_MS);
   }
 
   function onKeydown(e) {
@@ -636,20 +895,55 @@ function setupWelcomeOverlay() {
   syncOptions();
   document.body.classList.add("welcome-open");
   overlay.classList.remove("hidden");
+  blockEl.focus();
 }
 
-const deepLinkParams = new URLSearchParams(location.search);
-const deepLinkBlock = (deepLinkParams.get("block") || "").trim();
-const deepLinkLot = (deepLinkParams.get("lot") || "").trim();
+function applyDeepLinkViewState() {
+  if (!hasDeepLinkViewState()) return false;
+  const map = controller.map;
+  const lat = deepLinkViewState.lat;
+  const lng = deepLinkViewState.lng;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return false;
+  const zoom = Math.max(
+    map.getMinZoom(),
+    Math.min(map.getMaxZoom(), deepLinkViewState.zoom),
+  );
+  map.setView([lat, lng], zoom, { animate: false });
+  return true;
+}
+
+function applyDeepLinkViewStateWhenReady() {
+  if (!hasDeepLinkViewState()) return;
+  if (controller.blockSelect.options.length > 1) {
+    applyDeepLinkViewState();
+    return;
+  }
+  const observer = new MutationObserver(() => {
+    if (controller.blockSelect.options.length <= 1) return;
+    observer.disconnect();
+    applyDeepLinkViewState();
+  });
+  observer.observe(controller.blockSelect, { childList: true });
+}
 
 function buildShareUrl() {
   const block = controller.blockSelect.value;
   const lot = controller.lotSelect.value;
+  const center = controller.map.getCenter();
+  const zoom = controller.map.getZoom();
   const url = new URL(location.href);
   url.search = "";
   url.hash = "";
   if (block) url.searchParams.set("block", block);
   if (block && lot) url.searchParams.set("lot", lot);
+  url.searchParams.set("lat", center.lat.toFixed(6));
+  url.searchParams.set("lng", center.lng.toFixed(6));
+  url.searchParams.set("z", zoom.toFixed(2));
+  url.searchParams.set("obs", layerObstacle.checked ? "1" : "0");
+  url.searchParams.set("adm", layerAdministrative.checked ? "1" : "0");
+  url.searchParams.set("amen", layerAmenities.checked ? "1" : "0");
+  url.searchParams.set("road", layerRoadNames.checked ? "1" : "0");
+  url.searchParams.set("deco", isPhoneDevice ? "0" : layerDecoration.checked ? "1" : "0");
   return url.toString();
 }
 
@@ -685,6 +979,9 @@ function applyDeepLink() {
   }
   controller.lotSelect.dispatchEvent(new Event("change"));
   searchForm.requestSubmit();
+  setTimeout(() => {
+    applyDeepLinkViewState();
+  }, 0);
   return true;
 }
 
@@ -697,5 +994,6 @@ if (deepLinkBlock) {
     observer.observe(controller.blockSelect, { childList: true });
   }
 } else {
+  applyDeepLinkViewStateWhenReady();
   setupWelcomeOverlay();
 }

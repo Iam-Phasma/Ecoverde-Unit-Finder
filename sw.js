@@ -1,11 +1,12 @@
-const STATIC_CACHE = "ecoverde-static-v5";
-const RUNTIME_CACHE = "ecoverde-runtime-v5";
+const STATIC_CACHE = "ecoverde-static-v6";
+const RUNTIME_CACHE = "ecoverde-runtime-v6";
 
 const PRECACHE_URLS = [
   "./",
   "index.html",
   "css/style.css",
   "assets/favicon.svg",
+  "data/ecoverde.geojson",
   "js/main.js",
   "js/map-controller.js",
   "js/graph.js",
@@ -42,6 +43,16 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
+  if (!/^https?:$/.test(url.protocol)) return;
+
+  const isSameOrigin = url.origin === self.location.origin;
+  if (!isSameOrigin) {
+    if (request.destination === "image") {
+      event.respondWith(cacheFirst(request));
+    }
+    return;
+  }
+
   const isMapData = url.pathname.endsWith("/data/ecoverde.geojson") || url.pathname.endsWith("data/ecoverde.geojson");
 
   if (isMapData) {
@@ -49,11 +60,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (
-    request.destination === "script" ||
-    request.destination === "style" ||
-    request.destination === "document"
-  ) {
+  if (request.destination === "document") {
+    event.respondWith(networkFirstDocument(request));
+    return;
+  }
+
+  if (request.destination === "script" || request.destination === "style") {
     event.respondWith(networkFirstAsset(request));
     return;
   }
@@ -67,23 +79,10 @@ async function cacheFirst(request) {
   const cached = await caches.match(request);
   if (cached) return cached;
 
-  const response = await fetch(request);
+  const response = await fetch(request, { cache: "no-store" });
   const cache = await caches.open(RUNTIME_CACHE);
   cache.put(request, response.clone());
   return response;
-}
-
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(RUNTIME_CACHE);
-  const cached = await cache.match(request);
-  const networkPromise = fetch(request)
-    .then((response) => {
-      cache.put(request, response.clone());
-      return response;
-    })
-    .catch(() => cached);
-
-  return cached || networkPromise;
 }
 
 async function networkFirstAsset(request) {
@@ -96,6 +95,21 @@ async function networkFirstAsset(request) {
     const cached = await cache.match(request);
     if (cached) return cached;
     throw new Error("Asset unavailable");
+  }
+}
+
+async function networkFirstDocument(request) {
+  const cache = await caches.open(RUNTIME_CACHE);
+  try {
+    const fresh = await fetch(request, { cache: "no-store" });
+    cache.put(request, fresh.clone());
+    return fresh;
+  } catch {
+    const byRequest = await cache.match(request);
+    if (byRequest) return byRequest;
+    const fallback = await caches.match("index.html");
+    if (fallback) return fallback;
+    throw new Error("Document unavailable");
   }
 }
 

@@ -18,8 +18,13 @@
     <link rel="modulepreload" href="js/main.js?v=20261010-route-pause-3" />
   </head>
   <body>
+    <a href="#search-form" class="skip-to-search">Skip to search controls</a>
     <main>
-      <div id="map"></div>
+      <div
+        id="map"
+        role="region"
+        aria-label="Interactive map of Ecoverde Homes Rosario"
+      ></div>
       <div
         id="reroute-banner"
         class="reroute-banner hidden"
@@ -54,17 +59,18 @@
           </svg>
           <span class="find-toggle-label">Find</span>
         </button>
-        <div class="layers-menu">
+        <div class="recent-menu">
           <button
             type="button"
-            id="layers-toggle"
+            id="recent-toggle"
             aria-haspopup="true"
             aria-expanded="false"
-            aria-label="Layers"
-            title="Show or hide map layers"
+            aria-controls="recent-panel"
+            aria-label="Recent searches"
+            title="Recent searches"
           >
             <svg
-              class="layers-toggle-icon"
+              class="recent-toggle-icon"
               aria-hidden="true"
               xmlns="http://www.w3.org/2000/svg"
               width="24"
@@ -77,32 +83,91 @@
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 stroke-width="2"
-                d="M5.005 11.19V12l6.998 4.042L19 12v-.81M5 16.15v.81L11.997 21l6.998-4.042v-.81M12.003 3 5.005 7.042l6.998 4.042L19 7.042 12.003 3Z"
+                d="M12 6v6l4 2m5-2a9 9 0 1 1-3.04-6.77"
               />
             </svg>
-            <span class="layers-toggle-label">Layers</span>
+            <span class="recent-toggle-label">Recent</span>
           </button>
-          <div id="layers-panel" class="layers-panel hidden">
-            <label>
-              <input type="checkbox" id="layer-amenities" checked />
-              Amenities
-            </label>
-            <label>
-              <input type="checkbox" id="layer-administrative" />
-              Buildings
-            </label>
-            <label id="layer-decoration-option">
-              <input type="checkbox" id="layer-decoration" checked />
-              Decorations
-            </label>
-            <label>
-              <input type="checkbox" id="layer-obstacle" />
-              Obstacles
-            </label>
-            <label>
-              <input type="checkbox" id="layer-road-names" checked />
-              Street names
-            </label>
+          <div
+            id="recent-panel"
+            class="recent-panel hidden"
+            role="region"
+            aria-label="Recent searches"
+          >
+            <div id="recent-list" class="recent-list"></div>
+          </div>
+        </div>
+        <div class="settings-menu">
+          <button
+            type="button"
+            id="settings-toggle"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="settings-panel"
+            aria-label="Settings"
+            title="Open settings"
+          >
+            <svg
+              class="settings-toggle-icon w-6 h-6 text-gray-800 dark:text-white"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 13v-2a1 1 0 0 0-1-1h-.757l-.707-1.707.535-.536a1 1 0 0 0 0-1.414l-1.414-1.414a1 1 0 0 0-1.414 0l-.536.535L14 4.757V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v.757l-1.707.707-.536-.535a1 1 0 0 0-1.414 0L4.929 6.343a1 1 0 0 0 0 1.414l.536.536L4.757 10H4a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h.757l.707 1.707-.535.536a1 1 0 0 0 0 1.414l1.414 1.414a1 1 0 0 0 1.414 0l.536-.535 1.707.707V20a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-.757l1.707-.708.536.536a1 1 0 0 0 1.414 0l1.414-1.414a1 1 0 0 0 0-1.414l-.535-.536.707-1.707H20a1 1 0 0 0 1-1Z"
+              />
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
+              />
+            </svg>
+            <span class="settings-toggle-label">Settings</span>
+          </button>
+          <div id="settings-panel" class="settings-panel hidden">
+            <div class="settings-section settings-section-layers">
+              <h2 class="settings-title">Layers</h2>
+              <label>
+                <input type="checkbox" id="layer-amenities" checked />
+                Amenities
+              </label>
+              <label>
+                <input type="checkbox" id="layer-administrative" />
+                Buildings
+              </label>
+              <label id="layer-decoration-option">
+                <input type="checkbox" id="layer-decoration" checked />
+                Decorations
+              </label>
+              <label>
+                <input type="checkbox" id="layer-obstacle" />
+                Obstacles
+              </label>
+              <label>
+                <input type="checkbox" id="layer-road-names" checked />
+                Street names
+              </label>
+            </div>
+            <div class="settings-section settings-section-ui">
+              <h2 class="settings-title">UI size</h2>
+              <label class="ui-size-select-wrap">
+                <select id="ui-size-select" class="ui-size-select" aria-label="UI size">
+                  <option value="default">Default</option>
+                  <option value="x2">2x</option>
+                  <option value="x4">4x</option>
+                  <option value="x6">6x</option>
+                </select>
+              </label>
+            </div>
           </div>
         </div>
       </form>
@@ -120,7 +185,13 @@
         data-lyket-show-counter-from="999999"
       ></div>
 
-      <aside id="route-panel" class="route-panel hidden" aria-live="polite">
+      <aside
+        id="route-panel"
+        class="route-panel hidden"
+        aria-live="polite"
+        role="region"
+        aria-labelledby="route-unit"
+      >
         <div class="route-panel-section route-panel-head">
           <div id="route-unit" class="route-unit">Block -, Lot -</div>
           <div id="route-meta" class="route-meta">
