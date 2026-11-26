@@ -72,6 +72,15 @@ function contextWaterCoreWidthMeters(props) {
   return 6.8;
 }
 
+function buildingOutlineWeight(styleContext) {
+  const { zoom } = normalizeRoadStyleContext(styleContext);
+  if (zoom <= 16) return 0;
+  if (zoom <= 17) return 0.35;
+  if (zoom <= 18) return 0.6;
+  if (zoom <= 19) return 0.85;
+  return 1;
+}
+
 /** Outermost green verge underlay drawn before the gray outline and road fill. */
 export function roadVergeStyle(props, zoomScale = 1) {
   return null;
@@ -251,13 +260,13 @@ function barrierStyle(props) {
   return { color: "#8a7e6c", weight: 2.5, opacity: 0.8 };
 }
 
-export function styleForFeature(feature) {
+export function styleForFeature(feature, styleContext) {
   const c = feature.properties.category;
   switch (c) {
     case "road":
-      return roadStyle(feature.properties);
+      return roadStyle(feature.properties, styleContext);
     case "context-road":
-      return contextRoadStyle(feature.properties);
+      return contextRoadStyle(feature.properties, styleContext);
     case "context-water":
       return {
         color: "transparent",
@@ -361,9 +370,10 @@ export function styleForFeature(feature) {
     case "building":
       return {
         color: "#b9935f",
-        weight: 1,
+        weight: buildingOutlineWeight(styleContext),
         fillColor: "#e4cb9e",
         fillOpacity: 0.95,
+        lineJoin: "round",
       };
     case "cityblock":
       return {

@@ -315,6 +315,7 @@ export function createMapController() {
   updateRerouteButtonState();
   map.on("zoomend", () => {
     refreshRoadNameLabels();
+    applyBuildingStrokeScale();
     applyRoadStrokeScale();
     applyTreeSizeScale();
     clearTreeZoomAnimationScale();
@@ -611,6 +612,7 @@ export function createMapController() {
     populateAdministrativePins(collection.features);
     ensureScrapyardPattern();
     updateAdministrativeClusters();
+    applyBuildingStrokeScale();
     applyRoadStrokeScale();
     applyRoadLayerOrder();
     refreshRoadNameLabels();
@@ -1267,6 +1269,21 @@ export function createMapController() {
         roadStyleContextForLayer(layer),
       );
       if (centerStyle) layer.setStyle(centerStyle);
+    });
+  }
+
+  function applyBuildingStrokeScale() {
+    const highlightedLayers = new Set(highlighted?.layers || []);
+    layers.buildings.eachLayer((layer) => {
+      const props = layer.feature?.properties;
+      if (
+        !props ||
+        props.category !== "building" ||
+        typeof layer.setStyle !== "function" ||
+        highlightedLayers.has(layer)
+      )
+        return;
+      layer.setStyle(styleForFeature(layer.feature, { zoom: map.getZoom() }));
     });
   }
 
@@ -3338,7 +3355,10 @@ export function createMapController() {
 
   function clearHighlight() {
     if (highlighted) {
-      const style = styleForFeature({ properties: highlighted.props });
+      const style = styleForFeature(
+        { properties: highlighted.props },
+        { zoom: map.getZoom() },
+      );
       for (const layer of highlighted.layers) {
         layer.setStyle(style);
         const el = layer.getElement && layer.getElement();
