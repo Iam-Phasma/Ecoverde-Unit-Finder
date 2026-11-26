@@ -464,10 +464,8 @@ function setupWelcomeOverlay() {
 
   const WELCOME_FADE_MS = 300;
 
-  // Slow "trailer" drift of the map behind the overlay (fine-pointer, motion-ok devices only).
-  const driftEnabled =
-    window.matchMedia("(hover: hover) and (pointer: fine)").matches &&
-    !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Keep the welcome map static at its current idle position.
+  const driftEnabled = false;
   const DRIFT_SPEED_PX_S = 20;
   const DRIFT_RAMP_S = 2.5;
   const DRIFT_FRAME_MS = 1000 / 30;

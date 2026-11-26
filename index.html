@@ -6,12 +6,16 @@
     <title>Ecoverde Homes Rosario Unit Finder</title>
     <link rel="preconnect" href="https://unpkg.com" crossorigin />
     <link rel="dns-prefetch" href="https://unpkg.com" />
+    <link rel="preconnect" href="https://gc.zgo.at" crossorigin />
+    <link rel="dns-prefetch" href="https://gc.zgo.at" />
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="preload" href="css/style.css?v=20261010-route-pause-3" as="style" />
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
     <link rel="stylesheet" href="css/style.css?v=20261010-route-pause-3" />
+    <link rel="modulepreload" href="js/main.js?v=20261010-route-pause-3" />
   </head>
   <body>
     <main>
@@ -180,7 +184,7 @@
       >
         <form id="welcome-form" class="welcome-card" autocomplete="off">
           <div class="welcome-brand">
-            <img src="assets/eco-logo.svg" alt="" />
+            <img src="assets/eco-logo.svg" alt="" loading="lazy" decoding="async" />
             <div>
               <h1 id="welcome-title">Ecoverde Homes</h1>
               <span class="welcome-location">ROSARIO</span>
@@ -229,11 +233,11 @@
       </div>
     </main>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/@lyket/widget@latest/dist/lyket.js?apiKey=pt_697795132193026632019e5e22420e"></script>
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script defer src="https://unpkg.com/@lyket/widget@latest/dist/lyket.js?apiKey=pt_697795132193026632019e5e22420e"></script>
     <script type="module" src="js/main.js?v=20261010-route-pause-3"></script>
     <script data-goatcounter="https://terralyft.goatcounter.com/count"
-        async src="//gc.zgo.at/count.js">
+        async src="https://gc.zgo.at/count.js">
       </script>
   </body>
 </html>
